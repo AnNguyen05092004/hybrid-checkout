@@ -7,6 +7,7 @@ import { dateTime, money, pct } from "../../lib/format";
 import { ALERT_LABEL } from "../../lib/reconcile";
 import { sku } from "../../mocks/catalog";
 import { MODEL_VERSIONS } from "../../mocks/models";
+import { AUDIT_REASON_LABEL, byPriority, cashierStats } from "../../lib/audit";
 
 const RANGES = [{ days: 1, label: "Hôm nay" }, { days: 7, label: "7 ngày" }, { days: 30, label: "30 ngày" }];
 
@@ -24,11 +25,14 @@ export function DashboardPage() {
   const alerts = txs.flatMap((t) => t.alerts.map((a) => ({ ...a, tx: t })));
   const caught = alerts.filter((a) => a.resolution === "DA_QUET_BO_SUNG").reduce((s, a) => s + a.value, 0);
   const withAlert = txs.filter((t) => t.alerts.some((a) => a.severity !== "LOW")).length;
-  const falseConfirmed = alerts.filter((a) => a.resolution === "QUAN_LY_XAC_NHAN_BAO_NHAM");
-  const serious = alerts.filter((a) => a.severity !== "LOW");
+  const serious = alerts.filter((a) => a.severity !== "LOW")
+    .map((a) => ({ ...a, id: `${a.tx.id}-${a.id}`, cashier: a.tx.cashier, falseAlarm: a.resolution === "BAO_NHAM" }));
+  const falseConfirmed = serious.filter((a) => a.falseAlarm);
   const selling = skus.filter((s) => s.selling);
   const covered = selling.filter((s) => isLearned(s.id)).length;
-  const pending = falseConfirmed.filter((a) => !a.review).slice(0, 5);
+  // Post-review queue in priority order, same as M02 (UC14).
+  const anomalous = new Set(cashierStats(serious).cashiers.filter((c) => c.anomalous).map((c) => c.cashier));
+  const pending = byPriority(falseConfirmed.filter((a) => !a.review), anomalous).slice(0, 5);
   const openBatch = batches.find((b) => b.status !== "DA_DEPLOY");
   const model = MODEL_VERSIONS.find((m) => m.batch === activeBatch)!;
 
@@ -57,7 +61,7 @@ export function DashboardPage() {
         <Stat label="Doanh thu" value={money(txs.reduce((s, t) => s + t.total, 0))} hint={`${txs.length} giao dịch`} />
         <Stat label="Món chưa quét đã phát hiện" value={money(caught)} hint="giá trị được quét bổ sung" tone="ok" />
         <Stat label="Khay có cảnh báo" value={txs.length ? pct((withAlert / txs.length) * 100) : "—"} hint={`${withAlert} khay`} />
-        <Stat label="Tỉ lệ QL xác nhận báo nhầm" value={serious.length ? pct((falseConfirmed.length / serious.length) * 100) : "—"} hint="trên cảnh báo mức Cao/TB" />
+        <Stat label="Tỉ lệ báo nhầm" value={serious.length ? pct((falseConfirmed.length / serious.length) * 100) : "—"} hint="cảnh báo Cao/TB được xác nhận là báo nhầm" />
         <Stat label="Độ phủ SKU" value={pct((covered / selling.length) * 100)} hint={`${covered}/${selling.length} SKU camera nhận diện được`} />
       </div>
       <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", alignItems: "start" }}>
@@ -90,11 +94,12 @@ export function DashboardPage() {
       <Card title="Cảnh báo chờ hậu kiểm" actions={<Link to="/alerts" className="small">Xem tất cả</Link>} bodyClass="">
         {pending.length === 0 ? <Empty title="Không có cảnh báo nào chờ hậu kiểm" /> : (
           <div className="table-wrap"><table className="table">
-            <thead><tr><th>Thời gian</th><th>Giao dịch</th><th>Loại</th><th>SKU</th><th>Thu ngân</th><th>Lý do QL xác nhận</th></tr></thead>
+            <thead><tr><th>Thời gian</th><th>Giao dịch</th><th>Loại</th><th>SKU</th><th>Thu ngân</th><th>Lý do thu ngân</th><th>Vì sao xem trước</th></tr></thead>
             <tbody>{pending.map((a) => (
-              <tr key={a.tx.id + a.id} className="clickable" onClick={() => navigate(`/transactions/${a.tx.id}`)}>
+              <tr key={a.id} className="clickable" onClick={() => navigate(`/transactions/${a.tx.id}`)}>
                 <td>{dateTime(a.tx.at)}</td><td className="mono">{a.tx.id}</td><td><Badge tone="danger">{ALERT_LABEL[a.type]}</Badge></td>
                 <td>{sku((a.seenSku ?? a.scannedSku)!).name}</td><td>{a.tx.cashier}</td><td className="small muted">{a.reason}</td>
+                <td className="small">{a.reasons.map((r) => AUDIT_REASON_LABEL[r]).join(", ") || "—"}</td>
               </tr>
             ))}</tbody>
           </table></div>

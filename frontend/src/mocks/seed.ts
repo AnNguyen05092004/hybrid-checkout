@@ -30,12 +30,12 @@ export interface Counter {
   cameraOnline: boolean;
 }
 
-export type Resolution = "MO" | "DA_QUET_BO_SUNG" | "QUAN_LY_XAC_NHAN_BAO_NHAM" | "TU_DONG";
+/** BAO_NHAM: the cashier closed the alert as a model error, with a reason (BR-04). */
+export type Resolution = "MO" | "DA_QUET_BO_SUNG" | "BAO_NHAM" | "TU_DONG";
 export type Review = "XAC_NHAN_DUNG" | "BAO_NHAM_THAT" | "NGHI_GIAN_LAN";
 
 export interface AlertRecord extends TrayAlert {
   resolution: Resolution;
-  confirmedBy?: string;
   reason?: string;
   review?: Review;
 }
@@ -156,7 +156,7 @@ function seedTransactions(): Transaction[] {
   const cashiers = ["Nguyễn Thu Hà", "Trần Minh Khoa"];
   const now = Date.now();
   const out: Transaction[] = [];
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < 120; i++) {
     const key = `tx-${i}`;
     const t = trays[i % trays.length];
     const scanned = new Map<number, number>();
@@ -180,10 +180,10 @@ function seedTransactions(): Transaction[] {
     });
     const alerts: AlertRecord[] = result.alerts.map((a, k) => {
       if (a.severity === "LOW") return { ...a, resolution: "TU_DONG" };
-      const falseAlarm = hash01(`${key}-fa-${k}`) < 0.12;
+      // The second cashier closes far more alerts as false alarms, so the post-review flags them.
+      const falseAlarm = hash01(`${key}-fa-${k}`) < (i % 2 ? 0.4 : 0.08);
       return falseAlarm
-        ? { ...a, resolution: "QUAN_LY_XAC_NHAN_BAO_NHAM", confirmedBy: "Lê Quốc Bảo", reason: "Báo nhầm — model nhầm SKU",
-            review: hash01(`${key}-rv`) < 0.5 ? "BAO_NHAM_THAT" : undefined }
+        ? { ...a, resolution: "BAO_NHAM", reason: "Model nhầm SKU", review: hash01(`${key}-rv`) < 0.3 ? "BAO_NHAM_THAT" : undefined }
         : { ...a, resolution: "DA_QUET_BO_SUNG" };
     });
     // Lines after fixing: missed items scanned in addition
@@ -196,6 +196,7 @@ function seedTransactions(): Transaction[] {
       .map(([id, qty]) => ({ skuId: id, qty, price: sku(id).price, source: "BARCODE" }));
     const at = new Date(now - Math.floor(hash01(`${key}-t`) * 7 * 24) * 3600_000 - i * 60_000);
     at.setHours(8 + Math.floor(hash01(`${key}-h`) * 13));
+    if (at.getTime() > now) at.setDate(at.getDate() - 1); // opening hours of today may still be ahead
     out.push({
       id: `GD${String(1000 + i)}`, at: at.toISOString(), counterId: i % 3 === 0 ? "Q2" : "Q1",
       cashier: cashiers[i % 2], mode: i % 4 === 0 ? "FAST" : "VERIFY", trayId: t.id, modelVersion: "v4",

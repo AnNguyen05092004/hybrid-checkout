@@ -11,6 +11,7 @@ import { CartPanel } from "./components/CartPanel";
 import { DeviceSimulator } from "./components/DeviceSimulator";
 import { ReviewList } from "./components/ReviewList";
 import { StepBar } from "./components/StepBar";
+import { FalseAlarmDialog } from "./FalseAlarmDialog";
 import { ManagerPinDialog } from "./ManagerPinDialog";
 import { PaymentDialog } from "./PaymentDialog";
 import { trayBoxes } from "./trayBoxes";
@@ -22,6 +23,8 @@ interface PinRequest {
   reasons: string[];
   run: (reason: string, manager: string) => void;
 }
+
+const FALSE_ALARM_REASONS = ["Model nhầm SKU", "Món khách mang theo, không mua", "Vật không phải hàng hóa"];
 
 const MODE_HINT: Record<Mode, string> = {
   VERIFY: "Quét mã từng món, camera kiểm tra khay trước khi thanh toán",
@@ -36,6 +39,7 @@ export function PosPage() {
   const [focusAlert, setFocusAlert] = useState<string | null>(null);
   const [allLabels, setAllLabels] = useState(false);
   const [pin, setPin] = useState<PinRequest | null>(null);
+  const [falseAlarm, setFalseAlarm] = useState<TrayAlert | null>(null);
   const [paying, setPaying] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const focusInput = () => setTimeout(() => inputRef.current?.focus(), 0);
@@ -54,12 +58,9 @@ export function PosPage() {
     focusInput();
   };
 
-  const askManagerForAlert = (a: TrayAlert) => setPin({
-    title: "Xác nhận báo nhầm",
-    summary: `${ALERT_LABEL[a.type]}: ${sku((a.seenSku ?? a.scannedSku)!).name} × ${a.qty}`,
-    reasons: ["Báo nhầm — model nhầm SKU", "Báo nhầm — món khách mang theo, không mua", "Báo nhầm — vật không phải hàng hóa"],
-    run: (reason, manager) => { co.dismiss(a.id, { reason, manager }); log("CONFIRM_FALSE_ALARM", co.counter.name, `${manager}: ${reason}`); },
-  });
+  const alertSummary = (a: TrayAlert) => `${ALERT_LABEL[a.type]}: ${sku((a.seenSku ?? a.scannedSku)!).name} × ${a.qty}`;
+
+
 
   const askRemoveLine = (l: TxLine) => setPin({
     title: "Xóa dòng",
@@ -153,13 +154,23 @@ export function PosPage() {
         </div>
 
         <ReviewList co={co} onPick={focusInput} />
-        <AlertList co={co} focus={focusAlert} onFocus={setFocusAlert} onScanMore={focusInput} onAskManager={askManagerForAlert} />
+        <AlertList co={co} focus={focusAlert} onFocus={setFocusAlert} onScanMore={focusInput} onFalseAlarm={setFalseAlarm} />
         <CartPanel co={co} onRemove={askRemoveLine} onCancel={askCancel} onPay={() => setPaying(true)} />
       </div>
 
       {pin && (
         <ManagerPinDialog title={pin.title} summary={pin.summary} reasons={pin.reasons} onClose={() => setPin(null)}
           onConfirm={(reason, manager) => { pin.run(reason, manager); setPin(null); focusInput(); }} />
+      )}
+      {falseAlarm && (
+        <FalseAlarmDialog summary={alertSummary(falseAlarm)} reasons={FALSE_ALARM_REASONS}
+          onClose={() => setFalseAlarm(null)}
+          onConfirm={(reason) => {
+            co.dismiss(falseAlarm.id, { reason });
+            log("FALSE_ALARM", co.counter.name, `${alertSummary(falseAlarm)} — ${reason}`);
+            setFalseAlarm(null);
+            focusInput();
+          }} />
       )}
       {paying && (
         <PaymentDialog lines={co.lines} alertCount={Object.keys(co.raised).length} onPaid={co.pay}

@@ -1,6 +1,6 @@
 # Bước 4 — UI/UX
 
-Prototype chạy được ở [`frontend/`](../frontend/): React + TypeScript + Vite, dữ liệu giả lập, đủ 27 màn hình và hộp thoại của [IA](03-information-architecture.md).
+Prototype chạy được ở [`frontend/`](../frontend/): React + TypeScript + Vite, dữ liệu giả lập, đủ 28 màn hình và hộp thoại của [IA](03-information-architecture.md).
 
 ## 1. Nguyên tắc thiết kế
 
@@ -9,7 +9,7 @@ Prototype chạy được ở [`frontend/`](../frontend/): React + TypeScript + 
 | 1 | Bước tiếp theo luôn rõ ràng | Màn quầy có thanh 3 bước; nút bị khóa luôn kèm một dòng giải thích lý do |
 | 2 | Mã vạch trước, camera hỗ trợ | Ô mã vạch luôn giữ con trỏ cho máy quét; camera là nút riêng, không chặn việc quét |
 | 3 | Cảnh báo trước khi trả tiền | Cảnh báo mức Cao khóa nút Thanh toán |
-| 4 | Một cảnh báo, một hành động chính | Nút chính là **Quét bổ sung**; "báo nhầm" là nút phụ và cần PIN quản lý |
+| 4 | Một cảnh báo, một hành động chính | Nút chính là **Quét bổ sung**; **Camera báo nhầm** là nút phụ: chọn lý do rồi đi tiếp, không chờ quản lý; quản lý hậu kiểm sau |
 | 5 | Ảnh khay ít rối | Box khớp chỉ có viền xanh; chỉ box cần chú ý mới hiện tên. Có nút "Hiện tên mọi món" |
 | 6 | Không chỉ dựa vào màu | Box có ký hiệu ✓ ! ? ✎ và chữ; trạng thái có huy hiệu chữ |
 | 7 | Cảm ứng ở quầy | Nút chính cao 52 px; bàn phím PIN số lớn |
@@ -49,7 +49,7 @@ Font **Be Vietnam Pro** (dấu tiếng Việt rõ); số tiền dùng `tabular-n
 
 ## 4. Luồng chính
 
-**Kiểm tra chéo:** Quét mã → Kiểm tra khay → (có cảnh báo: Quét bổ sung, hoặc PIN quản lý) → Thanh toán.
+**Kiểm tra chéo:** Quét mã → Kiểm tra khay → (có cảnh báo: Quét bổ sung, hoặc Camera báo nhầm) → Thanh toán.
 
 **Làn nhanh:** Nhận diện khay → món xanh tự vào giỏ → quét món cam và món không có khung → tích "đã quét hết" → Thanh toán.
 
@@ -66,7 +66,11 @@ Tráo mã: quét gói khăn giấy rẻ cho gói đắt hơn cùng nhóm → **N
 
 ![Nghi tráo mã](images/ui/07-pos-swap.png)
 
-Báo nhầm cần PIN quản lý và lý do; thu ngân không tự đóng được.
+Camera sai: thu ngân bấm **Camera báo nhầm**, chọn lý do và đi tiếp. Hộp thoại nói rõ ảnh, lý do và tên thu ngân được lưu để hậu kiểm.
+
+![Camera báo nhầm](images/ui/08a-false-alarm.png)
+
+PIN quản lý chỉ dùng cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay.
 
 ![PIN quản lý](images/ui/08-manager-pin.png)
 
@@ -81,7 +85,11 @@ Món chắc chắn tự vào giỏ (nguồn **Camera**); món không chắc có 
 
 ### Dashboard, Cảnh báo, Giao dịch, SKU
 ![Dashboard](images/ui/19-dashboard.png)
+
+Hậu kiểm: báo nhầm đáng ngờ (giá trị cao, thu ngân có tỉ lệ báo nhầm bất thường) nằm trên cùng, kèm lý do vì sao cần xem trước.
+
 ![Cảnh báo](images/ui/20-alerts.png)
+
 ![Chi tiết giao dịch](images/ui/21-transaction.png)
 ![Danh mục SKU](images/ui/22-skus.png)
 
@@ -134,7 +142,7 @@ python3 scripts/prepare_samples.py --model-repo <đường dẫn repo model>   #
 cd frontend
 npm install
 npm run dev      # http://localhost:5173
-npm test         # unit test thuật toán đối chiếu
+npm test         # unit test: đối chiếu khay, hậu kiểm, box
 npm run lint
 ```
 
@@ -145,15 +153,16 @@ Giới hạn:
 - Huấn luyện mô phỏng khoảng 10 giây; số liệu AP50, cAcc của các phiên bản là kết quả đánh giá thật của model.
 - PIN quản lý demo: `246810`.
 
-## 9. Kịch bản demo (5 phút)
+## 9. Kịch bản demo (khoảng 7 phút)
 
-1. **Thu ngân** → Mở ca Quầy 1. Model v4 nhận diện 175/200 SKU.
-2. **Kiểm tra chéo:** quét thiếu 1 món → Kiểm tra khay → cảnh báo đỏ → Quét món đó → Thanh toán.
-3. **Tráo mã:** bấm "Tráo" ở một món → Kiểm tra khay → Yêu cầu quản lý → nhập PIN.
-4. **Làn nhanh:** chọn khay "có hàng mới" → Nhận diện → quét các món cam → Thanh toán.
-5. **Kỹ sư ML** → Đợt nhập → Đợt 5 → **Mở ảnh mẫu** → nhận ảnh cho 5 SKU còn thiếu → **Tạo ảnh ghép** → về đợt → **Gán nhãn ảnh thật** → chấp nhận đề xuất, vẽ hàng mới (hoặc "Điền box mẫu") → lưu 4 ảnh.
-6. **Gửi huấn luyện** → đợi job xong → Phiên bản model → v5 → **Deploy**.
-7. **Thu ngân** → Làn nhanh với khay đó: hàng mới giờ được tự nhận.
+1. **Thu ngân** → **Mở ca** ở Quầy 1.
+2. **Kiểm tra chéo:** trong khung "Mô phỏng thiết bị" (thay cho khay thật và máy quét), bấm **Quét** cho mọi món trừ một món → **Kiểm tra khay** → cảnh báo đỏ "Món chưa quét", nút Thanh toán bị khóa → bấm **Quét** món còn thiếu → cảnh báo tự đóng → **Thanh toán**.
+3. **Báo nhầm và PIN:** ở giao dịch mới, bấm **Tráo** ở một món (quét mã một món rẻ hơn cùng nhóm), quét các món còn lại → **Kiểm tra khay** → cảnh báo "Nghi tráo mã". Giả sử camera sai: **Camera báo nhầm** → chọn lý do → thanh toán được ngay. Bấm thùng rác ở một dòng giỏ hàng để xem hộp thoại PIN quản lý.
+4. **Làn nhanh:** chọn tab **Làn nhanh** → chọn khay có ghi "có hàng mới" → **Nhận diện khay**. Món khung xanh tự vào giỏ. Món **khung cam có số thứ tự** là món camera chưa chắc chắn (thường là hàng mới model chưa học): quét từng món này → tích "đã quét hết món ngoài vùng" → **Thanh toán**.
+5. **Kỹ sư ML** → Đợt nhập → **Đợt 5** → **Mở ảnh mẫu**: 5 SKU còn thiếu ảnh (nhãn cam), chọn từng SKU và bấm **Nhận ảnh rõ** (SKU nào vẫn chưa đủ 8 ảnh thì bấm ✓ ở ảnh "Cần xem kỹ") → **Tạo ảnh ghép**. Về Đợt 5 → **Gán nhãn ảnh thật**: hàng đợi demo có **4 ảnh khay thật** chứa hàng mới. Với mỗi ảnh: **Điền box mẫu** (thay cho việc tự vẽ box hàng mới) → **Chấp nhận ≥ 0,7** → chấp nhận nốt các đề xuất "Cần xem kỹ" → **Lưu & ảnh tiếp**. Lưu đủ 4 ảnh thì tập kiểm tra đạt 52/50 ảnh và nút Gửi huấn luyện sáng lên.
+6. **Gửi huấn luyện** → đợi job khoảng 10 giây → **Phiên bản model** → **v5** → xem cổng duyệt → **Deploy**.
+7. **Thu ngân** → **Làn nhanh** → chọn lại khay ở bước 4: hàng mới giờ được camera tự nhận, không phải quét nữa.
+8. **Quản lý** → **Cảnh báo & Hậu kiểm**: mục "Cần hậu kiểm trước" liệt kê báo nhầm đáng ngờ kèm lý do; bảng theo thu ngân gắn cờ "Bất thường" cho một người.
 
 ## 10. Màn hình → mã nguồn
 
@@ -164,7 +173,10 @@ Giới hạn:
 | M01–M08 | `features/store/*` |
 | L01–L07 | `features/ml/*` |
 | A01–A04 | `features/admin/*` |
-| Đối chiếu khay (UC07) | `lib/reconcile.ts` + `lib/reconcile.test.ts` |
+| Đối chiếu khay (UC07) | `lib/reconcile.ts` + test |
+| Thứ tự hậu kiểm, cờ bất thường (BR-17) | `lib/audit.ts` + test |
+| Độ trùng box khi gán nhãn | `lib/box.ts` + test |
+| Ngưỡng dữ liệu đợt nhập (BR-11, BR-16) | `app/rules.ts` |
 
 ## Nguồn
 

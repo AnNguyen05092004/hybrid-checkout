@@ -45,7 +45,7 @@ POS chỉ biết những món **đã được quét**. Món quét sót, cố ý 
 | ID | Mục tiêu | Chỉ tiêu ban đầu |
 |---|---|---|
 | G1 | Bắt món quét sót | ≥ 90% |
-| G2 | Ít báo nhầm khay sạch | ≤ 10% |
+| G2 | Ít báo nhầm | ≤ 10%: trong 100 khay đã quét đủ và đúng, tối đa 10 khay vẫn bị cảnh báo |
 | G3 | Phát hiện tráo mã | Đo và báo cáo |
 | G4 | Làn nhanh tự nhận món | ≥ 70% món, đúng ≥ 99% |
 | G5 | Phản hồi tại quầy | ≤ 3 giây (có GPU) |
@@ -107,8 +107,8 @@ Mọi vai trò dùng chung UC01 Đăng nhập, UC02 Đăng xuất, UC03 Hồ sơ
 
 | Cảnh báo | Mức | Chặn thanh toán | Cách đóng |
 |---|---|---|---|
-| Món chưa quét | Cao | Có | Quét bổ sung, hoặc quản lý xác nhận báo nhầm bằng PIN |
-| Nghi tráo mã | Cao / Trung bình | Khi mức Cao | Xóa dòng sai và quét đúng, hoặc quản lý xác nhận |
+| Món chưa quét | Cao | Có | Quét bổ sung, hoặc thu ngân xác nhận báo nhầm (BR-04) |
+| Nghi tráo mã | Cao / Trung bình | Khi mức Cao | Xóa dòng sai và quét đúng, hoặc thu ngân xác nhận báo nhầm (BR-04) |
 | Quét nhưng camera không thấy | Thấp | Không | Tự đóng khi thanh toán |
 | Không kiểm tra được khay | Trung bình | Có | Thử lại, hoặc quản lý cho bỏ qua |
 
@@ -122,8 +122,8 @@ Mọi vai trò dùng chung UC01 Đăng nhập, UC02 Đăng xuất, UC03 Hồ sơ
 | US04 | Thu ngân | mở ca tại một quầy | giao dịch ghi đúng quầy, đúng người |
 | US05 | Thu ngân | quét mã và thấy giỏ cập nhật ngay | thao tác như POS quen thuộc |
 | US06 | Thu ngân | hệ thống kiểm tra khay trước khi thanh toán | biết ngay món nào chưa quét hoặc quét sai |
-| US07 | Thu ngân | xử lý cảnh báo bằng quét bổ sung | hoàn tất giao dịch nhanh |
-| US08 | Quản lý | xác nhận bằng PIN ngay tại quầy | không chặn khách lâu mà vẫn có người chịu trách nhiệm |
+| US07 | Thu ngân | xử lý cảnh báo bằng quét bổ sung, hoặc tự xác nhận "camera báo nhầm" kèm lý do | không phải chờ quản lý mỗi khi model sai |
+| US08 | Quản lý | xác nhận bằng PIN tại quầy cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay | thao tác nhạy cảm luôn có người chịu trách nhiệm |
 | US09 | Thu ngân | camera đề xuất hóa đơn cho cả khay | phục vụ nhanh giờ cao điểm |
 | US10 | Thu ngân | biết món nào cần quét xác nhận | không bỏ sót ở làn nhanh |
 | US11 | Thu ngân | chọn phương thức thanh toán, xuất hóa đơn | kết thúc giao dịch |
@@ -147,15 +147,25 @@ Mọi vai trò dùng chung UC01 Đăng nhập, UC02 Đăng xuất, UC03 Hồ sơ
 | Story | Tiêu chí chấp nhận |
 |---|---|
 | US06 | Kết quả ≤ 3 giây (có GPU) · Đúng các cảnh báo theo UC07 · Không cảnh báo cho hàng mới chưa học đã quét · Box luôn có chữ, không chỉ dựa vào màu |
-| US07 | Bấm cảnh báo → ảnh làm nổi vùng liên quan · Quét đúng SKU → cảnh báo tự đóng · Không có nút "Bỏ qua" cho cảnh báo Cao |
-| US08 | PIN đúng + lý do → cảnh báo đóng, ghi người và thời gian · Sai 3 lần → khóa 5 phút · Từ chối PIN của người đang đứng quầy |
+| US07 | Bấm cảnh báo → ảnh làm nổi vùng liên quan · Quét đúng SKU → cảnh báo tự đóng · "Camera báo nhầm": chọn lý do, không cần PIN, không giới hạn số lần, hộp thoại báo rõ sẽ được lưu để hậu kiểm · Không có nút "Bỏ qua" cho cảnh báo Cao |
+| US08 | Hộp thoại nêu rõ việc cần xác nhận (xóa dòng, hủy giao dịch, bỏ qua kiểm tra) · PIN đúng + lý do → ghi người và thời gian · Sai 3 lần → khóa 5 phút · Từ chối PIN của người đang đứng quầy |
 | US09, US10 | Món đã học có độ tin ≥ ngưỡng tự nhận vào giỏ với nguồn "Camera" · Món không chắc màu cam, có số thứ tự · Còn món cam thì không thanh toán · Phải tích "đã quét hết món ngoài vùng" |
+| US14 | Mục "Cần hậu kiểm trước" xếp theo BR-17, ghi rõ vì sao · Bảng theo thu ngân có tỉ lệ báo nhầm và cờ "Bất thường" · Đánh dấu: Cảnh báo đúng / Báo nhầm thật / Nghi gian lận |
 | US17 | Ảnh cắt có trạng thái Chờ duyệt / Cần xem kỹ / Nhận / Loại · Đếm ảnh đã nhận / mục tiêu · "Tạo ảnh ghép" chỉ bật khi mọi SKU đủ ảnh |
 | US18 | Đề xuất nét đứt có độ tin · Chấp nhận hàng loạt ≥ 0,7 · Kéo chuột vẽ box · Đề xuất dưới box vẽ tự bị thay · Không lưu khi còn đề xuất chưa duyệt · Hỏi lại khi số box khác số lượng theo mã vạch |
 | US19 | Bảng theo SKU: ảnh mẫu đã nhận, box trong tập kiểm tra · "Gửi huấn luyện" chỉ bật khi đạt BR-11 |
 | US21, US22 | Bảng điều kiện cổng duyệt: giá trị mới, bản đang chạy, Đạt / Không đạt · Deploy xác nhận lần hai, không đạt thì bắt buộc ghi lý do · Rollback đưa SKU của đợt về Chưa học |
 
-**INVEST:** mỗi story cho ra một kết quả demo được và chỉ phụ thuộc đăng nhập (I); giao diện đổi được, mục tiêu và quyền giữ nguyên (N); giá trị ghi ở cột "Để…" (V); đầu vào, đầu ra, lỗi đã nêu trong use case (E); mỗi story một chức năng, US18 lớn nhất sẽ tách 18a duyệt đề xuất / 18b vẽ box khi code (S); mọi story có tiêu chí quan sát được (T).
+**Đánh giá INVEST:**
+
+| Tiêu chí | Nghĩa | Cách đáp ứng |
+|---|---|---|
+| **I** — Independent | Độc lập | Mỗi story cho ra một kết quả demo được; chỉ phụ thuộc đăng nhập (US01) và dữ liệu có sẵn |
+| **N** — Negotiable | Thương lượng được | Bố cục giao diện đổi được; mục tiêu và quyền giữ nguyên |
+| **V** — Valuable | Có giá trị | Mỗi story ghi rõ giá trị ở cột "Để…" |
+| **E** — Estimable | Ước lượng được | Đầu vào, đầu ra, vai trò và trường hợp lỗi đã nêu trong use case và tiêu chí chấp nhận |
+| **S** — Small | Nhỏ gọn | Mỗi story một chức năng. US18 lớn nhất, khi code tách thành 18a (duyệt đề xuất) và 18b (vẽ box) |
+| **T** — Testable | Kiểm thử được | Mọi story có tiêu chí chấp nhận quan sát được |
 
 ### 2.4 Quy tắc nghiệp vụ chính
 
@@ -163,23 +173,25 @@ Mọi vai trò dùng chung UC01 Đăng nhập, UC02 Đăng xuất, UC03 Hồ sơ
 |---|---|
 | BR-01 | Mã vạch quyết định hóa đơn; camera chỉ đề xuất hoặc cảnh báo |
 | BR-02 | Camera chỉ kiểm tra SKU mà model đang chạy đã học; SKU khác bán bằng mã vạch |
-| BR-03, 04 | Còn cảnh báo Cao thì không thanh toán được. Thu ngân chỉ đóng bằng quét bổ sung; "báo nhầm" cần PIN quản lý |
+| BR-03 | Còn cảnh báo Cao thì không thanh toán được |
+| BR-04 | Thu ngân đóng cảnh báo Cao bằng quét bổ sung, hoặc tự xác nhận "camera báo nhầm" kèm lý do. Không cần PIN, không giới hạn số lần; hệ thống lưu ảnh khay, lý do, người và thời gian để hậu kiểm |
 | BR-05 | Xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay cần PIN quản lý |
 | BR-06 | Mỗi giao dịch lưu danh sách quét, giá lúc bán, ảnh khay, kết quả nhận diện, phiên bản model, cảnh báo và cách xử lý |
 | BR-07, 08 | Một phiên bản model chạy tại một thời điểm; deploy phải qua cổng duyệt hoặc ghi lý do; luôn rollback được |
-| BR-09 | Cổng duyệt đo trên **ảnh thật**: phiên bản mới không kém bản đang chạy, không làm giảm việc nhận diện hàng cũ · bắt món sót ≥ 90% · báo nhầm khay sạch ≤ 10% |
+| BR-09 | Cổng duyệt đo trên **ảnh thật**: phiên bản mới không kém bản đang chạy, không làm giảm việc nhận diện hàng cũ · bắt món sót ≥ 90% · báo nhầm ≤ 10% (G2) |
 | BR-10 | Ngưỡng chọn trên tập kiểm tra (val), không chọn trên tập test |
 | BR-11 | Gửi huấn luyện khi: mỗi SKU mới ≥ 8 ảnh cắt đã nhận · đã tạo ảnh ghép · tập kiểm tra ≥ 50 ảnh thật, mỗi SKU mới ≥ 20 box |
 | BR-12 | Box đề xuất chỉ thành nhãn khi người chấp nhận; ảnh thật phải có box cho mọi món, kể cả hàng cũ |
 | BR-13 | Ảnh giao dịch giữ 30 ngày; ảnh đợt nhập xóa 14 ngày sau deploy |
 | BR-14, 15 | Chỉ quản lý đổi giá; mã vạch không trùng. Phân quyền kiểm tra ở backend |
 | BR-16 | Ảnh thật vào tập kiểm tra trước; chỉ phần vượt mức mới được trộn vào huấn luyện khi kỹ sư ML bật |
+| BR-17 | Hậu kiểm báo nhầm theo thứ tự ưu tiên: giá trị ≥ 30.000 ₫ · thu ngân bất thường (≥ 5 cảnh báo và tỉ lệ báo nhầm ≥ 1,5 lần mức chung của cửa hàng) · mẫu ngẫu nhiên 10% số còn lại. Báo nhầm lặp lại trên cùng cặp SKU ở nhiều thu ngân được coi là lỗi model → đưa vào hàng đợi ảnh khó |
 
 ### 2.5 Vai trò và quyền
 
 | Chức năng | Thu ngân | Quản lý | Kỹ sư ML | Quản trị viên |
 |---|:-:|:-:|:-:|:-:|
-| Bán hàng tại quầy, xử lý cảnh báo bằng quét bổ sung | ✓ | ✓ | | |
+| Bán hàng tại quầy, xử lý cảnh báo (quét bổ sung, báo nhầm) | ✓ | ✓ | | |
 | Xác nhận bằng PIN | | ✓ | | |
 | Lịch sử giao dịch | Ca của mình | Toàn cửa hàng | | |
 | Dashboard, hậu kiểm, danh mục SKU | | ✓ | Xem | |
@@ -197,10 +209,10 @@ Chi tiết (sơ đồ use case theo khu vực, đặc tả UC05–UC22, trạng 
 
 ## 3. Kiến trúc thông tin
 
-27 màn hình và hộp thoại. Mã: **S** chung · **P** quầy · **M** cửa hàng · **L** model · **A** quản trị.
+28 màn hình và hộp thoại. Mã: **S** chung · **P** quầy · **M** cửa hàng · **L** model · **A** quản trị.
 
 ```text
-S01 Đăng nhập
+S01 Đăng nhập · S03 Không có quyền (khi mở trang ngoài quyền)
 ├── QUẦY — toàn màn hình, cảm ứng                         Thu ngân, Quản lý
 │   ├── P01 Mở ca
 │   ├── P02 Quầy — Kiểm tra chéo   ┐  + P04 Hộp thoại PIN quản lý
@@ -240,12 +252,20 @@ Mỗi màn hình được mô tả theo section và quyền từng vai trò (tha
 **Kiểm tra chéo:** quét sót 1 thanh sô-cô-la → camera đóng khung đỏ đúng món đó, nút Thanh toán khóa kèm lý do.
 ![Kiểm tra chéo](docs/images/ui/04-pos-verify-alert.png)
 
-**Nghi tráo mã:** quét gói khăn giấy rẻ cho gói đắt hơn cùng nhóm → mức Cao; "báo nhầm" cần PIN quản lý.
+**Nghi tráo mã:** quét gói khăn giấy rẻ cho gói đắt hơn cùng nhóm → mức Cao.
 ![Nghi tráo mã](docs/images/ui/07-pos-swap.png)
+
+**Camera báo nhầm:** thu ngân chọn lý do và đi tiếp ngay, không chờ quản lý, không giới hạn số lần. Hệ thống lưu lại để hậu kiểm.
+![Camera báo nhầm](docs/images/ui/08a-false-alarm.png)
+
+**PIN quản lý:** chỉ cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay.
 ![PIN quản lý](docs/images/ui/08-manager-pin.png)
 
 **Làn nhanh:** món chắc chắn tự vào giỏ (nguồn Camera); món không chắc màu cam có số, chờ quét.
 ![Làn nhanh](docs/images/ui/09-fast-lane.png)
+
+**Hậu kiểm:** báo nhầm đáng ngờ được đưa lên trước (giá trị cao, thu ngân có tỉ lệ báo nhầm bất thường); lỗi model lặp lại thì đưa vào hàng đợi ảnh khó.
+![Hậu kiểm](docs/images/ui/20-alerts.png)
 
 **Đợt nhập:** tiến trình 5 bước, tiến độ từng SKU theo hai loại dữ liệu; Gửi huấn luyện chỉ bật khi đủ.
 ![Đợt nhập](docs/images/ui/11-batch5.png)
@@ -270,19 +290,20 @@ Prototype React + TypeScript + Vite, dữ liệu giả lập trong bộ nhớ, t
 python3 scripts/prepare_samples.py --model-repo <đường dẫn repo model>   # chép ảnh khay mẫu
 cd frontend && npm install
 npm run dev      # http://localhost:5173
-npm test         # unit test
+npm test         # unit test: đối chiếu khay, hậu kiểm, box
 npm run lint
 ```
 
-**Kịch bản demo 5 phút** (chọn tài khoản demo trên trang đăng nhập; PIN quản lý `246810`):
+**Kịch bản demo** (khoảng 7 phút; chọn tài khoản demo trên trang đăng nhập; PIN quản lý `246810`):
 
-1. **Thu ngân** → Mở ca Quầy 1.
-2. **Kiểm tra chéo:** quét thiếu 1 món → Kiểm tra khay → cảnh báo đỏ → quét món đó → Thanh toán.
-3. **Tráo mã:** bấm "Tráo" ở một món → Kiểm tra khay → Yêu cầu quản lý → nhập PIN.
-4. **Làn nhanh:** chọn khay "có hàng mới" → Nhận diện → quét các món cam → Thanh toán.
-5. **Kỹ sư ML** → Đợt 5 → Mở ảnh mẫu → nhận ảnh cho 5 SKU còn thiếu → Tạo ảnh ghép → Gán nhãn ảnh thật → lưu 4 ảnh.
-6. **Gửi huấn luyện** → đợi job xong → Phiên bản model → v5 → Deploy.
-7. **Thu ngân** → Làn nhanh với khay đó: hàng mới giờ được tự nhận.
+1. **Thu ngân** → **Mở ca** ở Quầy 1.
+2. **Kiểm tra chéo:** trong khung "Mô phỏng thiết bị" (thay cho khay thật và máy quét), bấm **Quét** cho mọi món trừ một món → **Kiểm tra khay** → cảnh báo đỏ "Món chưa quét", nút Thanh toán bị khóa → bấm **Quét** món còn thiếu → cảnh báo tự đóng → **Thanh toán**.
+3. **Báo nhầm và PIN:** ở giao dịch mới, bấm **Tráo** ở một món (quét mã một món rẻ hơn cùng nhóm), quét các món còn lại → **Kiểm tra khay** → cảnh báo "Nghi tráo mã". Giả sử camera sai: **Camera báo nhầm** → chọn lý do → thanh toán được ngay. Bấm thùng rác ở một dòng giỏ hàng để xem hộp thoại PIN quản lý.
+4. **Làn nhanh:** chọn tab **Làn nhanh** → chọn khay có ghi "có hàng mới" → **Nhận diện khay**. Món khung xanh tự vào giỏ. Món **khung cam có số thứ tự** là món camera chưa chắc chắn (thường là hàng mới model chưa học): quét từng món này → tích "đã quét hết món ngoài vùng" → **Thanh toán**.
+5. **Kỹ sư ML** → Đợt nhập → **Đợt 5** → **Mở ảnh mẫu**: 5 SKU còn thiếu ảnh (nhãn cam), chọn từng SKU và bấm **Nhận ảnh rõ** (SKU nào vẫn chưa đủ 8 ảnh thì bấm ✓ ở ảnh "Cần xem kỹ") → **Tạo ảnh ghép**. Về Đợt 5 → **Gán nhãn ảnh thật**: hàng đợi demo có **4 ảnh khay thật** chứa hàng mới. Với mỗi ảnh: **Điền box mẫu** (thay cho việc tự vẽ box hàng mới) → **Chấp nhận ≥ 0,7** → chấp nhận nốt các đề xuất "Cần xem kỹ" → **Lưu & ảnh tiếp**. Lưu đủ 4 ảnh thì tập kiểm tra đạt 52/50 ảnh và nút Gửi huấn luyện sáng lên.
+6. **Gửi huấn luyện** → đợi job khoảng 10 giây → **Phiên bản model** → **v5** → xem cổng duyệt → **Deploy**.
+7. **Thu ngân** → **Làn nhanh** → chọn lại khay ở bước 4: hàng mới giờ được camera tự nhận, không phải quét nữa.
+8. **Quản lý** → **Cảnh báo & Hậu kiểm**: mục "Cần hậu kiểm trước" liệt kê báo nhầm đáng ngờ kèm lý do; bảng theo thu ngân gắn cờ "Bất thường" cho một người.
 
 **Giới hạn:** tải lại trang (F5) là mất trạng thái demo · nhận diện và huấn luyện là mô phỏng · ảnh khay là ảnh ghép từ bộ mẫu của model, dùng thay ảnh camera.
 

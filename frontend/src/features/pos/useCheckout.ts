@@ -16,7 +16,6 @@ export interface Review {
 
 export interface Dismissal {
   reason: string;
-  manager?: string;
 }
 
 /**
@@ -158,7 +157,7 @@ export function useCheckout() {
     const alerts: AlertRecord[] = Object.values(raised).map((a) => {
       const d = dismissed[a.id];
       if (a.severity === "LOW") return { ...a, resolution: "TU_DONG", reason: d?.reason };
-      if (d) return { ...a, resolution: "QUAN_LY_XAC_NHAN_BAO_NHAM", reason: d.reason, confirmedBy: d.manager };
+      if (d) return { ...a, resolution: "BAO_NHAM", reason: d.reason };
       return { ...a, resolution: "DA_QUET_BO_SUNG" };
     });
     addTransaction({

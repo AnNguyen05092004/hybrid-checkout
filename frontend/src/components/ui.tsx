@@ -124,7 +124,7 @@ const JOB: Record<Job["status"], [string, string]> = {
 export const JobBadge = ({ status }: { status: Job["status"] }) => <Badge tone={JOB[status][0]}>{JOB[status][1]}</Badge>;
 
 export const RESOLUTION_LABEL: Record<Resolution, string> = {
-  MO: "Đang mở", DA_QUET_BO_SUNG: "Đã quét bổ sung", QUAN_LY_XAC_NHAN_BAO_NHAM: "QL xác nhận báo nhầm", TU_DONG: "Tự đóng (mức thấp)",
+  MO: "Đang mở", DA_QUET_BO_SUNG: "Đã quét bổ sung", BAO_NHAM: "Thu ngân báo nhầm", TU_DONG: "Tự đóng (mức thấp)",
 };
 export const REVIEW_LABEL: Record<Review, string> = {
   XAC_NHAN_DUNG: "Cảnh báo đúng", BAO_NHAM_THAT: "Báo nhầm thật", NGHI_GIAN_LAN: "Nghi gian lận",

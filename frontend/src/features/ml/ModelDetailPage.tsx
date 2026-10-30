@@ -24,7 +24,7 @@ export function ModelDetailPage() {
     { name: "AP50 val không giảm quá 1 điểm", cand: pct(v.ap50, 2), ref: base ? pct(base.ap50, 2) : "—", pass: !base || v.ap50 >= base.ap50 - GATE.maxAp50Drop },
     { name: `Mức quên SKU cũ ≤ ${GATE.maxForgetting} điểm AP50`, cand: "≈ 0", ref: "—", pass: v.forgetting <= GATE.maxForgetting },
     { name: `Bắt món sót (giả lập) ≥ ${GATE.minMissRecall}%`, cand: pct(v.missRecall), ref: base ? pct(base.missRecall) : "—", pass: v.missRecall >= GATE.minMissRecall },
-    { name: `Báo nhầm khay sạch (giả lập) ≤ ${GATE.maxFalseAlarm}%`, cand: pct(v.falseAlarm), ref: base ? pct(base.falseAlarm) : "—", pass: v.falseAlarm <= GATE.maxFalseAlarm },
+    { name: `Báo nhầm trên khay quét đủ (giả lập) ≤ ${GATE.maxFalseAlarm}%`, cand: pct(v.falseAlarm), ref: base ? pct(base.falseAlarm) : "—", pass: v.falseAlarm <= GATE.maxFalseAlarm },
   ];
   const allPass = gates.every((g) => g.pass);
   const isML = user?.role === "ML_ENGINEER";

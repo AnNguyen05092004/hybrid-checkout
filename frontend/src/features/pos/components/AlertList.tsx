@@ -6,12 +6,12 @@ import { sku } from "../../../mocks/catalog";
 import type { Checkout } from "../useCheckout";
 
 /** Reconciliation result: one card per alert, one main action per card (Quét bổ sung). */
-export function AlertList({ co, focus, onFocus, onScanMore, onAskManager }: {
+export function AlertList({ co, focus, onFocus, onScanMore, onFalseAlarm }: {
   co: Checkout;
   focus: string | null;
   onFocus: (id: string | null) => void;
   onScanMore: () => void;
-  onAskManager: (a: TrayAlert) => void;
+  onFalseAlarm: (a: TrayAlert) => void;
 }) {
   const { result, skipped, openAlerts, blocking } = co;
   if (!result && !skipped) return null;
@@ -48,7 +48,7 @@ export function AlertList({ co, focus, onFocus, onScanMore, onAskManager }: {
               {a.severity !== "LOW" ? (
                 <>
                   <button className="btn sm primary" onClick={onScanMore}><ScanBarcode size={14} /> Quét bổ sung</button>
-                  <button className="btn sm" onClick={() => onAskManager(a)}>Yêu cầu quản lý</button>
+                  <button className="btn sm" onClick={() => onFalseAlarm(a)}>Camera báo nhầm</button>
                 </>
               ) : (
                 <button className="btn sm" onClick={() => co.dismiss(a.id, { reason: "Thu ngân bỏ qua cảnh báo mức thấp" })}>Bỏ qua</button>

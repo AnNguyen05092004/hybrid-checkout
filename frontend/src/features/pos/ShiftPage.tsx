@@ -37,7 +37,7 @@ export function ShiftPage() {
         <Stat label="Giao dịch" value={mine.length} />
         <Stat label="Doanh thu ca" value={money(revenue)} />
         <Stat label="Cảnh báo đã quét bổ sung" value={alerts.filter((a) => a.resolution === "DA_QUET_BO_SUNG").length} />
-        <Stat label="Cảnh báo QL xác nhận báo nhầm" value={alerts.filter((a) => a.resolution === "QUAN_LY_XAC_NHAN_BAO_NHAM").length} />
+        <Stat label="Cảnh báo báo nhầm" value={alerts.filter((a) => a.resolution === "BAO_NHAM").length} hint="quản lý sẽ hậu kiểm" />
       </div>
       <Card title="Giao dịch trong ca" bodyClass="">
         {mine.length === 0 ? <Empty title="Chưa có giao dịch nào trong ca này" /> : (

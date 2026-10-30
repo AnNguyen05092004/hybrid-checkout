@@ -102,7 +102,7 @@ Dữ liệu: bộ RPC [8], 200 SKU thuộc 17 nhóm hàng, chia thành 5 đợt 
 | ID | Mục tiêu | Chỉ tiêu ban đầu | Cách đo |
 |---|---|---|---|
 | G1 | Bắt món quét sót | ≥ 90% | Trên ảnh test: bỏ ngẫu nhiên 1 món khỏi danh sách quét |
-| G2 | Ít báo nhầm khay sạch | ≤ 10% | Cùng thí nghiệm, khay không bỏ món |
+| G2 | Ít báo nhầm | ≤ 10% khay đã quét đủ và đúng mà vẫn bị cảnh báo | Cùng thí nghiệm, khay không bỏ món |
 | G3 | Phát hiện tráo mã | Đo và báo cáo | Thay 1 món bằng SKU cùng nhóm |
 | G4 | Làn nhanh tự nhận món | ≥ 70% món, đúng ≥ 99% | Trên ảnh test |
 | G5 | Phản hồi tại quầy | ≤ 3 giây (có GPU) | Đo khi demo |
@@ -144,7 +144,9 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | Suy luận chậm khi không có GPU | Đo sớm; nếu chậm thì dùng GPU thuê hoặc cache kết quả ảnh demo |
 | Báo nhầm nhiều, thu ngân bỏ qua cảnh báo | Chỉ cảnh báo khi đủ tự tin; chỉnh ngưỡng theo nhóm; theo dõi tỉ lệ báo nhầm |
 | SKU giống nhau bị nhầm, báo tráo mã sai | Hiện ảnh vùng nghi ngờ; hạ mức cảnh báo cho cặp hay nhầm |
-| Thu ngân tự tắt cảnh báo của mình | Cảnh báo nghiêm trọng chỉ đóng bằng quét bổ sung hoặc PIN quản lý |
+| Thu ngân lạm dụng "báo nhầm" | Mọi báo nhầm lưu ảnh, lý do, người; hậu kiểm ưu tiên món giá trị cao và thu ngân có tỉ lệ báo nhầm bất thường so với cửa hàng |
+| Chờ quản lý làm tắc quầy | Thu ngân tự xác nhận báo nhầm, không cần PIN; PIN chỉ cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra |
+| Model báo nhầm lặp lại | Thống kê báo nhầm theo cặp SKU; đưa ảnh vào hàng đợi ảnh khó để cải thiện model đợt sau |
 | Deploy model kém hơn | Cổng duyệt và rollback một bước |
 | Model tốt trên ảnh ghép nhưng kém ở quầy | Cổng duyệt chỉ đo trên ảnh thật; ảnh khó từ quầy đưa vào hàng đợi gán nhãn đợt sau |
 
@@ -156,7 +158,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | D02 | Chỉ quầy có thu ngân |
 | D03 | Ba tính năng AI: Kiểm tra chéo, Làn nhanh, Trợ lý gán nhãn |
 | D04 | Bốn vai trò: Thu ngân, Quản lý cửa hàng, Kỹ sư ML, Quản trị viên |
-| D05 | Đối chiếu diễn ra trước thanh toán; cảnh báo mức Cao chặn thanh toán |
+| D05 | Đối chiếu diễn ra trước thanh toán; cảnh báo mức Cao chặn thanh toán. Thu ngân tự xác nhận báo nhầm, quản lý hậu kiểm sau theo thứ tự ưu tiên |
 | D06 | Camera chỉ kiểm tra SKU mà model đang chạy đã học |
 | D07 | Model chạy thành dịch vụ riêng, hệ thống không sửa code model |
 | D08 | Tài liệu tiếng Việt; prototype giao diện bằng React, dữ liệu giả lập |

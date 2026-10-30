@@ -45,7 +45,7 @@ export function ThresholdsPage() {
         <div className="col" style={{ gap: 16 }}>
           <div className="stats">
             <Stat label="Bắt món sót" value={pct(preview.missRecall)} hint={`hiện tại ${pct(current.missRecall)} · mục tiêu ≥ 90%`} tone={preview.missRecall >= 90 ? "ok" : "danger"} />
-            <Stat label="Báo nhầm khay sạch" value={pct(preview.falseAlarm)} hint={`hiện tại ${pct(current.falseAlarm)} · mục tiêu ≤ 10%`} tone={preview.falseAlarm <= 10 ? "ok" : "danger"} />
+            <Stat label="Báo nhầm trên khay quét đủ" value={pct(preview.falseAlarm)} hint={`hiện tại ${pct(current.falseAlarm)} · mục tiêu ≤ 10%`} tone={preview.falseAlarm <= 10 ? "ok" : "danger"} />
             <Stat label="Món tự nhận ở làn nhanh" value={pct(preview.autoShare)} hint={`hiện tại ${pct(current.autoShare)} · mục tiêu ≥ 70%`} />
           </div>
           <Card title="Lịch sử cấu hình">

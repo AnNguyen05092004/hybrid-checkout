@@ -52,9 +52,9 @@ export function TransactionDetailPage() {
                 {tx.alerts.map((a) => (
                   <div key={a.id} className={`alert-card ${a.severity.toLowerCase()} ${focus === a.id ? "on" : ""}`} onClick={() => setFocus(focus === a.id ? null : a.id)}>
                     <div className="row"><span className="strong">{ALERT_LABEL[a.type]}</span><Badge tone={SEVERITY_TONE[a.severity]}>{SEVERITY_LABEL[a.severity]}</Badge><span className="spacer" />{a.value ? money(a.value) : ""}</div>
-                    <div className="small">{sku((a.seenSku ?? a.scannedSku)!).name} × {a.qty} — {RESOLUTION_LABEL[a.resolution]}{a.confirmedBy ? ` bởi ${a.confirmedBy}` : ""}</div>
+                    <div className="small">{sku((a.seenSku ?? a.scannedSku)!).name} × {a.qty} — {RESOLUTION_LABEL[a.resolution]}{a.resolution === "BAO_NHAM" ? ` (${tx.cashier})` : ""}</div>
                     {a.reason && <div className="small muted">Lý do: {a.reason}</div>}
-                    {a.resolution === "QUAN_LY_XAC_NHAN_BAO_NHAM" && (
+                    {a.resolution === "BAO_NHAM" && (
                       <div className="row wrap" onClick={(e) => e.stopPropagation()}>
                         <span className="small muted">Hậu kiểm:</span>
                         {(Object.keys(REVIEW_LABEL) as Review[]).map((r) => (

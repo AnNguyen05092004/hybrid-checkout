@@ -11,6 +11,7 @@ Vai trò: **TN** Thu ngân · **QL** Quản lý cửa hàng · **ML** Kỹ sư M
 flowchart TB
     root["HybridCheckout"]
     root --> S01["S01 Đăng nhập"]
+    root --> S03["S03 Không có quyền"]
     root --> pos["QUẦY<br/><i>toàn màn hình, cảm ứng</i>"]
     root --> bo["QUẢN TRỊ<br/><i>sidebar bên trái</i>"]
 
@@ -57,7 +58,7 @@ Mã màn hình: **S** chung · **P** quầy (POS) · **M** quản lý cửa hàn
 | Kỹ sư ML | L04 Phiên bản model | **Model:** Phiên bản · Job · Ngưỡng · Giám sát — **Dữ liệu:** Đợt nhập · Danh mục SKU · Dashboard |
 | Quản trị viên | A01 Người dùng | Người dùng · Quầy & Camera · Nhật ký · Cài đặt lưu trữ |
 
-Vào URL không có quyền → màn **Không có quyền**.
+Vào URL không có quyền → **S03 Không có quyền** (nút về trang mặc định của vai trò).
 
 ## 3. Thành phần dùng chung
 
@@ -84,6 +85,11 @@ Vào URL không có quyền → màn **Không có quyền**.
 | Đổi mật khẩu | Mật khẩu cũ, mới, xác nhận | ✏️ | ✏️ | ✏️ | ✏️ |
 | PIN quản lý | Đặt / đổi PIN 6 số | — | ✏️ | — | — |
 
+### S03 — Không có quyền · `/403`
+| Section | Nội dung | Mọi người |
+|---|---|:-:|
+| Thông báo | Vai trò hiện tại không mở được trang này; nút về trang mặc định của vai trò | 👁 |
+
 ## 5. Khu vực Quầy
 
 ### P01 — Mở ca · `/pos/open-shift`
@@ -102,7 +108,7 @@ Bố cục 2 cột: trái là ảnh khay, phải là các bước thao tác từ
 | Ô mã vạch | Luôn giữ con trỏ cho máy quét; báo lỗi mã không có / ngừng bán | ✏️ | ✏️ |
 | Ảnh khay | Trước khi kiểm tra: hướng dẫn. Sau khi kiểm tra: box xanh (khớp), đỏ (cảnh báo), xám nét đứt (không chắc) | 👁 | 👁 |
 | Nút Kiểm tra khay | Chụp và đối chiếu; đang xử lý; lỗi + thử lại; sau 2 lỗi: bỏ qua (cần PIN) | ✏️ | ✏️ |
-| Cảnh báo | Thẻ theo mức; bấm để làm nổi trên ảnh; **Quét bổ sung** / **Yêu cầu quản lý**; mức Thấp có **Bỏ qua** | ✏️ | ✏️ |
+| Cảnh báo | Thẻ theo mức; bấm để làm nổi trên ảnh; **Quét bổ sung** / **Camera báo nhầm** (hộp thoại chọn lý do, báo rõ sẽ được lưu để hậu kiểm); mức Thấp có **Bỏ qua** | ✏️ | ✏️ |
 | Giỏ hàng | Tên, mã, số lượng, đơn giá; nhãn "Camera chưa nhận diện" cho hàng mới; xóa dòng (cần PIN) | ✏️ | ✏️ |
 | Tổng tiền | Tổng; **Thanh toán** (khóa kèm lý do); **Hủy giao dịch** (cần PIN) | ✏️ | ✏️ |
 
@@ -121,7 +127,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 ### P04 — Hộp thoại PIN quản lý
 | Section | Nội dung | Người nhập: QL |
 |---|---|:-:|
-| Việc cần xác nhận | Báo nhầm / xóa dòng / hủy giao dịch / bỏ qua kiểm tra, kèm tóm tắt | 👁 |
+| Việc cần xác nhận | Xóa dòng / hủy giao dịch / bỏ qua kiểm tra, kèm tóm tắt | 👁 |
 | Lý do | Chọn lý do có sẵn + ghi chú | ✏️ |
 | Bàn phím PIN | 6 số; báo sai, đếm số lần sai | ✏️ |
 
@@ -148,14 +154,15 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 | Thẻ chỉ số | Doanh thu · Giá trị món chưa quét đã phát hiện · Khay có cảnh báo · Tỉ lệ báo nhầm · Độ phủ SKU | 👁 | 👁 |
 | Biểu đồ | Cảnh báo theo ngày, theo loại | 👁 | 👁 |
 | Model & đợt nhập | Model đang chạy; đợt nhập đang xử lý và tiến độ | 👁 | 👁 |
-| Chờ hậu kiểm | 5 cảnh báo bị xác nhận báo nhầm gần nhất → M03 | ✏️ | 👁 |
+| Chờ hậu kiểm | 5 báo nhầm ưu tiên cao nhất (BR-17) → M03 | ✏️ | 👁 |
 
 ### M02 — Cảnh báo & Hậu kiểm · `/alerts`
 | Section | Nội dung | QL | ML |
 |---|---|:-:|:-:|
-| Thẻ tóm tắt | Tổng · Đã quét bổ sung · QL xác nhận báo nhầm · Chờ hậu kiểm | 👁 | 👁 |
+| Thẻ tóm tắt | Tổng · Đã quét bổ sung · Thu ngân báo nhầm (kèm tỉ lệ cửa hàng) · Chờ hậu kiểm (số cần xem trước) | 👁 | 👁 |
+| Cần hậu kiểm trước | Báo nhầm xếp theo BR-17, cột "Vì sao xem trước"; bấm → M03 | ✏️ | — |
 | Bộ lọc + bảng | Lọc loại, mức, cách xử lý, thu ngân; bấm dòng → M03 | ✏️ | 👁 |
-| Theo thu ngân | Tỉ lệ báo nhầm được xác nhận; đánh dấu bất thường | 👁 | — |
+| Theo thu ngân | Số cảnh báo, số báo nhầm, tỉ lệ; cờ "Bất thường" khi ≥ 1,5 lần mức cửa hàng | 👁 | — |
 | Nhật ký | Nút mở A03 (nhật ký của cửa hàng) | ✏️ | — |
 
 ### M03 — Chi tiết giao dịch · `/transactions/:id`
@@ -259,6 +266,7 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lư
 |---|---|:-:|:-:|
 | Thẻ chỉ số | Độ trễ, khay có cảnh báo, báo nhầm, % tự nhận | 👁 | 👁 |
 | Biểu đồ + cặp hay nhầm | Theo ngày; top cặp nhầm | 👁 | 👁 |
+| Báo nhầm tại quầy theo SKU | Model thấy / thu ngân quét / số lần; **Vào hàng đợi ảnh khó** | ✏️ | 👁 |
 | Gợi ý | Việc nên làm cho đợt sau | 👁 | — |
 
 ## 8. Khu vực Quản trị — Hệ thống
@@ -274,7 +282,7 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lư
 
 | Màn hình | TN | QL | ML | AD |
 |---|:-:|:-:|:-:|:-:|
-| S01, S02 | ✏️ | ✏️ | ✏️ | ✏️ |
+| S01, S02, S03 | ✏️ | ✏️ | ✏️ | ✏️ |
 | P01–P06 | ✏️ | ✏️ | — | — |
 | M01 Dashboard, M02 Cảnh báo, M03 Chi tiết giao dịch | — | ✏️ | 👁 | — |
 | M04 Giao dịch | — | 👁 | — | — |

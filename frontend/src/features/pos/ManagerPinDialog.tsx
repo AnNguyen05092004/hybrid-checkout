@@ -4,7 +4,7 @@ import { useStore } from "../../app/store";
 import { Modal } from "../../components/ui";
 import { MANAGER_PIN, USERS } from "../../mocks/seed";
 
-/** P04 — Manager confirmation with PIN at the counter (UC12, BR-04, BR-05). */
+/** P04 — Manager confirmation with PIN at the counter (UC12, BR-05). */
 export function ManagerPinDialog({ title, summary, reasons, onConfirm, onClose }: {
   title: string;
   summary: ReactNode;
