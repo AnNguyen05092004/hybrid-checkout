@@ -1,0 +1,89 @@
+<!doctype html>
+<!-- Product mind map. Source of docs/images/mindmap.png: open in a browser and screenshot #map at 2x. -->
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<title>HybridCheckout mind map</title>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  body { margin: 0; background: #fff; font-family: "Be Vietnam Pro", sans-serif; }
+  #map { position: relative; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 0 90px; padding: 36px 40px; width: 1500px; box-sizing: border-box; background: #fff; }
+  .side { display: flex; flex-direction: column; gap: 22px; position: relative; z-index: 1; }
+  .branch { display: flex; align-items: center; gap: 34px; }
+  .left .branch { justify-content: flex-end; }
+  .leaves { display: flex; flex-direction: column; gap: 6px; }
+  .left .leaves { align-items: flex-end; }
+  .leaf { font-size: 14px; padding: 3px 9px; border-radius: 6px; color: #1f2937; white-space: nowrap; }
+  .pill { font-size: 17px; font-weight: 600; padding: 9px 16px; border-radius: 9px; white-space: nowrap; color: #111827; display: flex; align-items: center; gap: 8px; }
+  .ai { font-size: 11px; font-weight: 700; background: #111827; color: #fff; border-radius: 4px; padding: 1px 5px; }
+  .center { position: relative; z-index: 1; border: 2.5px solid #111827; border-radius: 14px; padding: 22px 26px; text-align: center; background: #fff; box-shadow: 3px 4px 0 #111827; }
+  .center b { display: block; font-size: 30px; }
+  .center span { display: block; font-size: 16px; color: #374151; margin-top: 6px; max-width: 260px; }
+  svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+  .legend { position: absolute; left: 40px; bottom: 12px; font-size: 12px; color: #6b7280; z-index: 1; }
+</style>
+</head>
+<body>
+<div id="map">
+  <div class="side left" id="left"></div>
+  <div class="center" id="center"><b>HybridCheckout</b><span>Thanh toán tại quầy kết hợp mã vạch và thị giác máy tính</span></div>
+  <div class="side right" id="right"></div>
+  <svg id="lines"></svg>
+  <div class="legend"><span class="ai">AI</span> tính năng dùng model nhận diện</div>
+</div>
+<script>
+const LEFT = [
+  ["Hồ sơ cá nhân", "#86c9a3", ["Cập nhật thông tin", "Đổi mật khẩu", "Đặt PIN quản lý"]],
+  ["Danh mục SKU", "#7cb8e8", ["Mã vạch, giá, nhóm hàng", "Thêm / sửa / ngừng bán", "Trạng thái nhận diện của SKU"]],
+  ["Trợ lý gán nhãn", "#c39be0", ["Tạo đợt nhập SKU mới", "Model đề xuất box hàng cũ", "Người vẽ box hàng mới", "Kiểm tra đủ dữ liệu"], true],
+  ["Quản lý model", "#9aa5ec", ["Job huấn luyện", "So sánh phiên bản", "Cổng duyệt", "Deploy / rollback", "Cấu hình ngưỡng"]],
+  ["Quản trị hệ thống", "#ef9fb8", ["Người dùng & vai trò", "Quầy & camera", "Nhật ký hệ thống", "Chính sách lưu ảnh"]],
+];
+const RIGHT = [
+  ["Đăng nhập & phân quyền", "#ee8a84", ["Đăng nhập / đăng xuất", "Phân quyền theo 4 vai trò", "Chặn truy cập khi không đủ quyền"]],
+  ["Kiểm tra chéo", "#f4a76b", ["Quét mã từng món", "Chụp & đối chiếu khay", "Cảnh báo món chưa quét", "Cảnh báo nghi tráo mã", "Chặn thanh toán khi có cảnh báo"], true],
+  ["Làn nhanh", "#e5c45a", ["Nhận diện cả khay", "Tự thêm món chắc chắn", "Quét xác nhận món không chắc", "Quét hàng mới chưa học"], true],
+  ["Xử lý tại quầy", "#8fcf7e", ["Mở / đóng ca", "Quét bổ sung", "Quản lý xác nhận bằng PIN", "Xóa dòng / hủy giao dịch", "Thanh toán & hóa đơn"]],
+  ["Báo cáo & giám sát", "#7fd0c8", ["Dashboard cửa hàng", "Hậu kiểm cảnh báo", "Lịch sử giao dịch", "Giám sát chất lượng model"]],
+];
+const soft = (hex) => hex + "33";
+function build(list, el, side) {
+  for (const [name, color, leaves, ai] of list) {
+    const b = document.createElement("div");
+    b.className = "branch";
+    const pill = `<div class="pill" style="background:${color}" data-color="${color}">${name}${ai ? '<span class="ai">AI</span>' : ""}</div>`;
+    const lv = `<div class="leaves">${leaves.map((l) => `<div class="leaf" style="background:${soft(color)}">${l}</div>`).join("")}</div>`;
+    b.innerHTML = side === "left" ? lv + pill : pill + lv;
+    el.appendChild(b);
+  }
+}
+build(LEFT, document.getElementById("left"), "left");
+build(RIGHT, document.getElementById("right"), "right");
+
+function draw() {
+  const map = document.getElementById("map").getBoundingClientRect();
+  const svg = document.getElementById("lines");
+  const c = document.getElementById("center").getBoundingClientRect();
+  let out = "";
+  document.querySelectorAll(".branch").forEach((b) => {
+    const left = b.parentElement.id === "left";
+    const p = b.querySelector(".pill").getBoundingClientRect();
+    const color = b.querySelector(".pill").dataset.color;
+    const x1 = (left ? c.left : c.right) - map.left, y1 = c.top + c.height / 2 - map.top;
+    const x2 = (left ? p.right : p.left) - map.left, y2 = p.top + p.height / 2 - map.top;
+    const mx = (x1 + x2) / 2;
+    out += `<path d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}" stroke="${color}" stroke-width="3" fill="none"/>`;
+    const px = (left ? p.left : p.right) - map.left;
+    const bx = left ? px - 16 : px + 16;
+    b.querySelectorAll(".leaf").forEach((l) => {
+      const r = l.getBoundingClientRect();
+      const lx = (left ? r.right : r.left) - map.left, ly = r.top + r.height / 2 - map.top;
+      out += `<path d="M${px},${y2} L${bx},${y2} L${bx},${ly} L${lx},${ly}" stroke="${color}" stroke-width="1.6" fill="none"/>`;
+    });
+  });
+  svg.innerHTML = out;
+}
+document.fonts.ready.then(draw);
+</script>
+</body>
+</html>

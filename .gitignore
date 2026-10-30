@@ -1,0 +1,13 @@
+# Dependencies and build output
+node_modules/
+dist/
+.vite/
+
+# RPC sample images: CC BY-NC-SA 4.0, copied locally by scripts/prepare_samples.py
+frontend/public/samples/
+
+# Local environment and OS files
+.env
+.env.local
+.DS_Store
+*.log
