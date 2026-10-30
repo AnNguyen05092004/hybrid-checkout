@@ -4,6 +4,7 @@ import { ArrowLeft, Check, CheckCheck, SkipForward, Trash2, Wand2, X } from "luc
 import { useStore } from "../../app/store";
 import { Badge, Card, Empty, Modal } from "../../components/ui";
 import { TrayViewer, type TrayBox } from "../../components/TrayViewer";
+import { iou } from "../../lib/box";
 import type { Box } from "../../lib/reconcile";
 import { sku } from "../../mocks/catalog";
 import { LEVEL_LABEL, detect, tray as getTray } from "../../mocks/trays";
@@ -13,7 +14,10 @@ interface Drawn { id: string; box: Box; skuId: number }
 
 const BULK_THRESHOLD = 0.7;
 
-/** L01 — Labelling assistant (UC17, US17): the model proposes old-SKU boxes, people draw new-SKU boxes. */
+/**
+ * L02 — Real-image labelling with the assistant (UC18, US18). The model proposes old-SKU boxes, people
+ * draw new-SKU boxes; saved images form the batch's real validation set, so every item needs a box.
+ */
 export function LabelingPage() {
   const { id } = useParams();
   const { labelQueue, labeledTrays, saveLabels, activeBatch, toast } = useStore();
@@ -26,7 +30,7 @@ export function LabelingPage() {
   const [drawn, setDrawn] = useState<Drawn[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [warn, setWarn] = useState<string[] | null>(null);
+  const [warn, setWarn] = useState<{ problems: string[]; blocking: boolean } | null>(null);
   const [skipping, setSkipping] = useState(false);
   const [stats, setStats] = useState({ proposals: 0, untouched: 0, images: 0 });
   const saveRef = useRef<() => void>(() => {});
@@ -71,13 +75,15 @@ export function LabelingPage() {
     return (
       <Card>
         <Empty icon={<CheckCheck size={32} color="var(--ok)" />} title="Đã gán nhãn hết hàng đợi của phiên này">
-          <Link to={`/batches/${id}`}>Về chi tiết đợt để gửi huấn luyện</Link>
+          <Link to={`/batches/${id}`}>Về chi tiết đợt</Link>
         </Empty>
       </Card>
     );
   }
 
-  const state = (pid: string) => states[pid] ?? "pending";
+  // A proposal under a hand-drawn box was a new SKU taken for an old one: it is replaced, not pending.
+  const replaced = new Set(proposals.filter((p) => drawn.some((d) => iou(d.box, p.box) >= 0.5)).map((p) => p.id));
+  const state = (pid: string): ProposalState => states[pid] ?? (replaced.has(pid) ? "rejected" : "pending");
   const pending = proposals.filter((p) => state(p.id) === "pending");
   const drawnCount = (skuId: number) => drawn.filter((d) => d.skuId === skuId).length;
 
@@ -90,12 +96,13 @@ export function LabelingPage() {
   ];
 
   const save = (force = false) => {
-    const problems: string[] = [];
-    if (pending.length) problems.push(`Còn ${pending.length} box đề xuất chưa duyệt (sẽ bị bỏ).`);
-    hints.forEach(([skuId, n]) => {
-      if (drawnCount(skuId) !== n) problems.push(`${sku(skuId).name}: mã vạch có ${n} món, đã vẽ ${drawnCount(skuId)} box.`);
-    });
-    if (problems.length && !force) return setWarn(problems);
+    // Unreviewed proposals would leave items without a box, which teaches the model they are background.
+    if (pending.length) {
+      return setWarn({ blocking: true, problems: [`Còn ${pending.length} box đề xuất chưa duyệt. Chấp nhận hoặc từ chối hết trước khi lưu.`] });
+    }
+    const problems = hints.filter(([skuId, n]) => drawnCount(skuId) !== n)
+      .map(([skuId, n]) => `${sku(skuId).name}: mã vạch có ${n} món, đã vẽ ${drawnCount(skuId)} box.`);
+    if (problems.length && !force) return setWarn({ blocking: false, problems });
     const counts: Record<number, number> = {};
     drawn.forEach((d) => (counts[d.skuId] = (counts[d.skuId] ?? 0) + 1));
     saveLabels(t.id, counts);
@@ -105,7 +112,7 @@ export function LabelingPage() {
       images: s.images + 1,
     }));
     setWarn(null);
-    toast(`Đã lưu nhãn khay ${t.id}.`);
+    toast(`Đã lưu khay ${t.id} vào tập kiểm tra.`);
   };
 
   saveRef.current = () => save();
@@ -114,8 +121,9 @@ export function LabelingPage() {
     <>
       <div className="row wrap">
         <button className="btn" onClick={() => navigate(`/batches/${id}`)}><ArrowLeft size={16} /> Đợt {id}</button>
-        <h2>Gán nhãn có trợ lý</h2>
+        <h2>Gán nhãn ảnh thật</h2>
         <Badge>Ảnh {done + 1}/{labelQueue.length}</Badge>
+        <Badge tone="info">Nguồn: giao dịch có hàng mới</Badge>
         <Badge>Khay {t.id} · {LEVEL_LABEL[t.level]} · {t.objects.length} món</Badge>
         <div className="spacer" />
         <button className="btn" onClick={() => setSkipping(true)}><SkipForward size={16} /> Bỏ qua ảnh</button>
@@ -172,7 +180,7 @@ export function LabelingPage() {
                     <div className="small strong">{sku(p.skuId).name}</div>
                     <div className="row small faint" style={{ gap: 6 }}>Đề xuất · {p.score.toFixed(2)}
                       {state(p.id) === "accepted" && <Badge tone="ok">Chấp nhận</Badge>}
-                      {state(p.id) === "rejected" && <Badge tone="danger">Từ chối</Badge>}
+                      {state(p.id) === "rejected" && <Badge tone="danger">{states[p.id] ? "Từ chối" : "Thay bằng box vẽ"}</Badge>}
                       {p.score < BULK_THRESHOLD && state(p.id) === "pending" && <Badge tone="warn">Cần xem kỹ</Badge>}
                     </div>
                   </span>
@@ -203,9 +211,9 @@ export function LabelingPage() {
       {warn && (
         <Modal title="Kiểm tra trước khi lưu" onClose={() => setWarn(null)} footer={<>
           <button className="btn" onClick={() => setWarn(null)}>Sửa tiếp</button>
-          <button className="btn primary" onClick={() => save(true)}>Vẫn lưu</button>
+          {!warn.blocking && <button className="btn primary" onClick={() => save(true)}>Vẫn lưu</button>}
         </>}>
-          <ul style={{ margin: 0, paddingLeft: 18 }} className="col">{warn.map((w) => <li key={w}>{w}</li>)}</ul>
+          <ul style={{ margin: 0, paddingLeft: 18 }} className="col">{warn.problems.map((w) => <li key={w}>{w}</li>)}</ul>
         </Modal>
       )}
       {skipping && (

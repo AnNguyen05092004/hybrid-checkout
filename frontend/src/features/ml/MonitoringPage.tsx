@@ -7,7 +7,7 @@ import { hash01, pct } from "../../lib/format";
 import { sku } from "../../mocks/catalog";
 import { CONFUSED_PAIRS } from "../../mocks/models";
 
-/** L06 — Model monitoring in the store (US23). */
+/** L07 — Model monitoring in the store (US24). */
 export function MonitoringPage() {
   const { transactions, user } = useStore();
   const days: { key: string; label: string }[] = [];
@@ -62,7 +62,7 @@ export function MonitoringPage() {
           <div className="col" style={{ gap: 8 }}>
             {CONFUSED_PAIRS.slice(0, 2).map((p) => (
               <div key={p.from} className="row small"><Lightbulb size={16} color="var(--warn)" />
-                <span><b>{sku(p.from).name}</b> hay bị nhận thành <b>{sku(p.to).name}</b>: thêm ảnh khay có cả hai SKU vào tập val của đợt sau, và cân nhắc hạ mức cảnh báo tráo mã của cặp này xuống Trung bình.</span>
+                <span><b>{sku(p.from).name}</b> hay bị nhận thành <b>{sku(p.to).name}</b>: gửi ảnh khay có cả hai SKU vào hàng đợi ảnh khó của đợt sau, và cân nhắc hạ mức cảnh báo tráo mã của cặp này xuống Trung bình.</span>
               </div>
             ))}
           </div>

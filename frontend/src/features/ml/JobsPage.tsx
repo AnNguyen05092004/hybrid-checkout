@@ -3,7 +3,7 @@ import { useStore } from "../../app/store";
 import { Card, Empty, JobBadge, PageHeader, Progress } from "../../components/ui";
 import { dateTime } from "../../lib/format";
 
-/** L02 — Training / evaluation jobs (US19). */
+/** L03 — Training / evaluation jobs (US20). */
 export function JobsPage() {
   const { jobs, toast } = useStore();
   const [openId, setOpenId] = useState<string | null>(jobs[0]?.id ?? null);

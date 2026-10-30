@@ -4,19 +4,19 @@
 
 ![Product mind map](images/mindmap.png)
 
-Nguồn chỉnh sửa: [diagrams/mindmap.html](diagrams/mindmap.html). Nhãn **AI** đánh dấu 3 tính năng dùng model nhận diện.
+
 
 ## 2. Tác nhân
 
 | Tác nhân | Loại | Vai trò trong hệ thống |
 |---|---|---|
 | Thu ngân | Chính | Bán hàng ở quầy, chế độ Kiểm tra chéo hoặc Làn nhanh |
-| Quản lý cửa hàng | Chính | Xác nhận bằng PIN tại quầy; danh mục, đợt nhập, hậu kiểm |
-| Kỹ sư ML | Chính | Gán nhãn, huấn luyện, duyệt và deploy model, chỉnh ngưỡng |
+| Quản lý cửa hàng | Chính | Xác nhận bằng PIN tại quầy; danh mục, đợt nhập, tải ảnh mẫu, hậu kiểm |
+| Kỹ sư ML | Chính | Duyệt ảnh mẫu, gán nhãn ảnh thật, huấn luyện, duyệt và deploy model, chỉnh ngưỡng |
 | Quản trị viên | Chính | Người dùng, quầy/camera, nhật ký, chính sách dữ liệu |
 | Máy quét mã vạch | Thiết bị | Nhập mã vạch vào màn quầy |
 | Camera quầy | Thiết bị | Chụp ảnh khay từ trên xuống |
-| Dịch vụ nhận diện | Hệ thống | Chạy model trên ảnh khay, trả về box, SKU, độ tin cậy |
+| Dịch vụ nhận diện | Hệ thống | Chạy model: nhận diện ảnh khay (box, SKU, độ tin); cắt nền ảnh mẫu |
 | Máy GPU huấn luyện | Hệ thống ngoài | Chạy job huấn luyện một đợt |
 
 ## 3. Sơ đồ use case
@@ -39,8 +39,8 @@ flowchart TB
         direction LR
         c["<b>Tại quầy</b><br/>UC04 Mở / đóng ca<br/>UC05 Thanh toán — Kiểm tra chéo<br/>UC06 Thanh toán — Làn nhanh<br/>UC08 Xử lý cảnh báo<br/>UC09 Hoàn tất thanh toán<br/>UC10 Xóa dòng / hủy giao dịch<br/>UC11 Xem lịch sử ca"]
         m["<b>Vận hành cửa hàng</b><br/>UC12 Xác nhận bằng PIN<br/>UC13 Xem dashboard<br/>UC14 Hậu kiểm cảnh báo<br/>UC15 Quản lý danh mục SKU<br/>UC16 Tạo và theo dõi đợt nhập"]
-        l["<b>Vận hành model</b><br/>UC17 Gán nhãn có trợ lý<br/>UC18 Gửi huấn luyện<br/>UC19 Theo dõi job<br/>UC20 Duyệt phiên bản model<br/>UC21 Deploy / rollback<br/>UC22 Cấu hình ngưỡng<br/>UC23 Giám sát model"]
-        a["<b>Quản trị</b><br/>UC24 Quản lý người dùng<br/>UC25 Quản lý quầy và camera<br/>UC26 Xem nhật ký<br/>UC27 Chính sách lưu dữ liệu"]
+        l["<b>Vận hành model</b><br/>UC17 Tạo ảnh ghép từ ảnh mẫu<br/>UC18 Gán nhãn ảnh thật có trợ lý<br/>UC19 Gửi huấn luyện<br/>UC20 Theo dõi job<br/>UC21 Duyệt phiên bản model<br/>UC22 Deploy / rollback<br/>UC23 Cấu hình ngưỡng<br/>UC24 Giám sát model"]
+        a["<b>Quản trị</b><br/>UC25 Quản lý người dùng<br/>UC26 Quản lý quầy và camera<br/>UC27 Xem nhật ký<br/>UC28 Chính sách lưu dữ liệu"]
     end
 
     g["<b>Chung — mọi vai trò:</b> UC01 Đăng nhập · UC02 Đăng xuất · UC03 Hồ sơ cá nhân"]
@@ -139,19 +139,20 @@ flowchart LR
         direction TB
         subgraph data["Dữ liệu và huấn luyện"]
             direction TB
-            uc17(["UC17 Gán nhãn có trợ lý"])
-            uc18(["UC18 Gửi huấn luyện"])
-            uc19(["UC19 Theo dõi job"])
+            uc17(["UC17 Tạo ảnh ghép từ ảnh mẫu"])
+            uc18(["UC18 Gán nhãn ảnh thật có trợ lý"])
+            uc19(["UC19 Gửi huấn luyện"])
+            uc20(["UC20 Theo dõi job"])
         end
         subgraph rel["Phát hành"]
             direction TB
-            uc20(["UC20 Duyệt phiên bản model"])
-            uc21(["UC21 Deploy / rollback"])
+            uc21(["UC21 Duyệt phiên bản model"])
+            uc22(["UC22 Deploy / rollback"])
         end
         subgraph ops["Vận hành"]
             direction TB
-            uc22(["UC22 Cấu hình ngưỡng"])
-            uc23(["UC23 Giám sát model"])
+            uc23(["UC23 Cấu hình ngưỡng"])
+            uc24(["UC24 Giám sát model"])
         end
     end
     subgraph ext["Hệ thống ngoài"]
@@ -161,10 +162,10 @@ flowchart LR
     end
 
     ml --> data & rel & ops
-    uc18 --- gpu
-    uc17 --- vision
-    uc21 --- vision
-    uc21 -. "«include»" .-> uc20
+    uc17 & uc18 --- vision
+    uc19 --- gpu
+    uc22 --- vision
+    uc22 -. "«include»" .-> uc21
 
     classDef actor fill:#475569,color:#fff,stroke:#334155
     classDef device fill:#f1f5f9,stroke:#94a3b8,color:#334155
@@ -173,7 +174,7 @@ flowchart LR
     style ext fill:#f8fafc,stroke:#cbd5e1
 ```
 
-Đợt nhập do Quản lý tạo ở UC16 là đầu vào của UC17.
+Đợt nhập do Quản lý tạo ở UC16 là đầu vào của UC17 và UC18; Quản lý cũng tải được ảnh mẫu ở UC17. Hai use case này chạy song song: UC17 tạo dữ liệu **huấn luyện**, UC18 tạo tập **kiểm tra** bằng ảnh thật.
 
 ### 3.5 Quản trị và chức năng chung
 
@@ -183,10 +184,10 @@ flowchart LR
     all(["Mọi vai trò"])
     subgraph adm["Quản trị"]
         direction TB
-        uc24(["UC24 Quản lý người dùng"])
-        uc25(["UC25 Quản lý quầy và camera"])
-        uc26(["UC26 Xem nhật ký"])
-        uc27(["UC27 Chính sách lưu dữ liệu"])
+        uc25(["UC25 Quản lý người dùng"])
+        uc26(["UC26 Quản lý quầy và camera"])
+        uc27(["UC27 Xem nhật ký"])
+        uc28(["UC28 Chính sách lưu dữ liệu"])
     end
     subgraph common["Chung"]
         direction TB
@@ -194,7 +195,7 @@ flowchart LR
         uc02(["UC02 Đăng xuất"])
         uc03(["UC03 Hồ sơ cá nhân"])
     end
-    admin --> uc24 & uc25 & uc26 & uc27
+    admin --> uc25 & uc26 & uc27 & uc28
     all --> uc01 & uc02 & uc03
     classDef actor fill:#475569,color:#fff,stroke:#334155
     class admin,all actor
@@ -220,17 +221,18 @@ flowchart LR
 | UC14 | Hậu kiểm cảnh báo | Quản lý | Xem lại cảnh báo đã đóng, đánh giá đúng/sai/gian lận |
 | UC15 | Quản lý danh mục SKU | Quản lý | Thêm, sửa giá, ngừng bán; xem trạng thái nhận diện |
 | UC16 | Tạo và theo dõi đợt nhập | Quản lý | Gom SKU mới thành đợt, theo dõi đến khi deploy |
-| UC17 | Gán nhãn có trợ lý | Kỹ sư ML | Duyệt box hàng cũ do model đề xuất, vẽ box hàng mới |
-| UC18 | Gửi huấn luyện | Kỹ sư ML | Khi đợt đủ dữ liệu, tạo job huấn luyện |
-| UC19 | Theo dõi job | Kỹ sư ML | Trạng thái, tiến độ, log, giờ GPU |
-| UC20 | Duyệt phiên bản model | Kỹ sư ML | So với phiên bản đang chạy theo cổng duyệt |
-| UC21 | Deploy / rollback | Kỹ sư ML | Đưa phiên bản mới ra quầy hoặc quay lại bản trước |
-| UC22 | Cấu hình ngưỡng | Kỹ sư ML | Chỉnh ngưỡng cảnh báo, ngưỡng tự nhận; xem trước tác động |
-| UC23 | Giám sát model | Kỹ sư ML | Báo nhầm, bản sửa, cặp hay nhầm, độ trễ |
-| UC24 | Quản lý người dùng | Quản trị viên | Tạo, sửa, khóa tài khoản, gán vai trò |
-| UC25 | Quản lý quầy và camera | Quản trị viên | Thêm quầy, gán camera, chụp thử |
-| UC26 | Xem nhật ký | Quản trị viên | Thao tác quan trọng, chỉ đọc |
-| UC27 | Chính sách lưu dữ liệu | Quản trị viên | Thời gian giữ ảnh giao dịch và ảnh đợt nhập |
+| UC17 | Tạo ảnh ghép từ ảnh mẫu | Kỹ sư ML (Quản lý tải ảnh) | Chụp từng SKU mới, duyệt ảnh đã cắt nền, ghép thành ảnh khay để huấn luyện |
+| UC18 | Gán nhãn ảnh thật có trợ lý | Kỹ sư ML | Trên ảnh khay thật: duyệt box hàng cũ do model đề xuất, vẽ box hàng mới → tập kiểm tra |
+| UC19 | Gửi huấn luyện | Kỹ sư ML | Khi đợt đủ dữ liệu, tạo job huấn luyện |
+| UC20 | Theo dõi job | Kỹ sư ML | Trạng thái, tiến độ, log, giờ GPU |
+| UC21 | Duyệt phiên bản model | Kỹ sư ML | So với phiên bản đang chạy theo cổng duyệt |
+| UC22 | Deploy / rollback | Kỹ sư ML | Đưa phiên bản mới ra quầy hoặc quay lại bản trước |
+| UC23 | Cấu hình ngưỡng | Kỹ sư ML | Chỉnh ngưỡng cảnh báo, ngưỡng tự nhận; xem trước tác động |
+| UC24 | Giám sát model | Kỹ sư ML | Báo nhầm, bản sửa, cặp hay nhầm, độ trễ |
+| UC25 | Quản lý người dùng | Quản trị viên | Tạo, sửa, khóa tài khoản, gán vai trò |
+| UC26 | Quản lý quầy và camera | Quản trị viên | Thêm quầy, gán camera, chụp thử |
+| UC27 | Xem nhật ký | Quản trị viên | Thao tác quan trọng, chỉ đọc |
+| UC28 | Chính sách lưu dữ liệu | Quản trị viên | Thời gian giữ ảnh giao dịch và ảnh đợt nhập |
 
 ## 5. Đặc tả use case chính
 
@@ -267,16 +269,26 @@ Chọn cảnh báo → ảnh làm nổi vùng liên quan → **Quét bổ sung**
 ### UC12 — Xác nhận bằng PIN
 Quản lý chọn lý do, nhập PIN 6 số trên màn quầy. Hệ thống ghi người xác nhận, thời gian, lý do. Không chấp nhận PIN của chính người đang đứng quầy. Sai 3 lần thì khóa 5 phút.
 
-### UC17 — Gán nhãn có trợ lý
-- **Tiền điều kiện:** đợt nhập đang ở bước gán nhãn; có ảnh khay chứa hàng mới (lấy từ giao dịch có mã của hàng mới, hoặc chụp bổ sung).
+### UC17 — Tạo ảnh ghép từ ảnh mẫu
+Ảnh ghép là nguồn dữ liệu **huấn luyện** chính: rẻ, nhiều, box có sẵn.
+
+1. Chụp từng SKU mới từ trên xuống, mỗi ảnh một sản phẩm, đủ các mặt và vài góc nghiêng. Quản lý hoặc kỹ sư ML tải ảnh lên.
+2. Dịch vụ nhận diện cắt nền từng ảnh, kèm điểm chất lượng; ảnh điểm thấp gắn "Cần xem kỹ".
+3. Kỹ sư ML **nhận** ảnh cắt sạch, **loại** ảnh bị lẹm hoặc dính vật khác.
+4. Khi mọi SKU đủ ảnh (BR-11), bấm **Tạo ảnh ghép**: hệ thống dán ảnh cắt lên nền khay theo bố cục giống quầy thật (số món, mức che khuất), sinh ảnh kèm box.
+
+### UC18 — Gán nhãn ảnh thật có trợ lý
+Ảnh ghép khác ảnh camera về ánh sáng, bóng và cách xếp, nên model phải được **đo trên ảnh thật**. UC18 tạo tập kiểm tra đó.
+
+- **Nguồn ảnh:** ảnh khay của giao dịch có quét mã hàng mới (mã vạch cho biết khay có món mới nào, bao nhiêu); ảnh khó gửi từ quầy (cảnh báo bị xác nhận báo nhầm, ảnh quản lý gửi từ chi tiết giao dịch).
 - **Luồng chính:**
-  1. Mở ảnh tiếp theo. Hệ thống hiện box **hàng cũ** do model đề xuất (nét đứt) và danh sách **hàng mới** trong khay theo mã vạch, kèm số lượng.
-  2. Chấp nhận từng box đề xuất hoặc chấp nhận hàng loạt các box có độ tin ≥ 0,7; từ chối box sai.
-  3. Chọn SKU mới, kéo chuột vẽ box cho từng món.
-  4. Lưu. Nếu số box hàng mới khác số lượng theo mã vạch, hoặc còn đề xuất chưa duyệt, hệ thống hỏi lại trước khi lưu.
+  1. Mở ảnh tiếp theo. Hệ thống hiện box **hàng cũ** do model đề xuất (nét đứt) và danh sách **hàng mới** theo mã vạch.
+  2. Chấp nhận từng box đề xuất hoặc hàng loạt các box có độ tin ≥ 0,7; từ chối box sai.
+  3. Chọn SKU mới, kéo chuột vẽ box cho từng món. Đề xuất nằm dưới box vừa vẽ (model đoán hàng mới thành hàng cũ) tự bị thay.
+  4. Lưu vào tập kiểm tra. Còn đề xuất chưa duyệt thì **không lưu được** (BR-12); số box hàng mới khác số lượng theo mã vạch thì hỏi lại.
 - **Rẽ nhánh:** ảnh mờ hoặc không có hàng mới → bỏ qua kèm lý do.
 
-### UC20, UC21 — Duyệt và deploy model
+### UC21, UC22 — Duyệt và deploy model
 Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**. Trang phiên bản so sánh với bản đang chạy theo từng điều kiện cổng duyệt (BR-09).
 - **Deploy:** xác nhận lần hai; nếu có điều kiện không đạt thì bắt buộc ghi lý do. Sau deploy, SKU của đợt chuyển **Đã học**.
 - **Rollback:** quay về bản trước; SKU của đợt bị rollback quay về **Chưa học**.
@@ -293,13 +305,14 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | BR-06 | Mỗi giao dịch lưu: danh sách quét, giá lúc bán, ảnh khay, kết quả nhận diện, phiên bản model, cảnh báo và cách xử lý |
 | BR-07 | Chỉ một phiên bản model chạy tại một thời điểm |
 | BR-08 | Deploy phải qua cổng duyệt hoặc ghi lý do override; luôn rollback được về bản liền trước |
-| BR-09 | Cổng duyệt: AP50 không giảm quá 1 điểm so với bản đang chạy · mức quên hàng cũ ≤ 5 điểm · bắt món sót ≥ 90% · báo nhầm khay sạch ≤ 10%. cAcc chỉ để tham khảo vì nó tự giảm khi số SKU tăng |
+| BR-09 | Cổng duyệt đo trên **tập kiểm tra ảnh thật**: AP50 không giảm quá 1 điểm so với bản đang chạy · mức quên hàng cũ ≤ 5 điểm · bắt món sót ≥ 90% · báo nhầm khay sạch ≤ 10%. cAcc chỉ để tham khảo vì nó tự giảm khi số SKU tăng |
 | BR-10 | Ngưỡng chỉnh theo nhóm đợt, chọn trên tập val, không chọn trên tập test |
-| BR-11 | Chỉ gửi huấn luyện khi mỗi SKU mới có ≥ 20 box đã duyệt và tập val của đợt ≥ 50 ảnh |
-| BR-12 | Box đề xuất của model chỉ thành nhãn khi được người chấp nhận |
-| BR-13 | Ảnh giao dịch giữ 30 ngày; ảnh đợt nhập xóa sau khi deploy 14 ngày (cấu hình được) |
+| BR-11 | Chỉ gửi huấn luyện khi: mỗi SKU mới có ≥ 8 ảnh cắt đã nhận (mặt trên, dưới, 4 cạnh, 2 góc nghiêng) · đã tạo ảnh ghép · tập kiểm tra ảnh thật ≥ 50 ảnh và mỗi SKU mới ≥ 20 box |
+| BR-12 | Box đề xuất của model chỉ thành nhãn khi được người chấp nhận. Ảnh thật chỉ lưu khi mọi món đều có box, kể cả hàng cũ: thiếu box thì model học món đó là nền |
+| BR-13 | Ảnh giao dịch giữ 30 ngày; ảnh đợt nhập (ảnh mẫu, ảnh thật) xóa sau khi deploy 14 ngày (cấu hình được) |
 | BR-14 | Chỉ quản lý đổi giá và trạng thái bán; mã vạch không trùng |
 | BR-15 | Phân quyền kiểm tra ở backend; ẩn nút trên giao diện chỉ để tiện dùng |
+| BR-16 | Ảnh thật vào tập kiểm tra trước. Chỉ phần vượt mức BR-11 mới được trộn vào huấn luyện, và chỉ khi kỹ sư ML bật (thí nghiệm). Không để ảnh của cùng một giao dịch ở cả hai tập |
 
 ### Loại cảnh báo
 
@@ -317,7 +330,7 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | Giao dịch | Đang quét → (Chờ xử lý cảnh báo) → Sẵn sàng thanh toán → Đã thanh toán; hoặc Đã hủy |
 | Cảnh báo | Mở → Đã quét bổ sung / QL xác nhận báo nhầm / Tự đóng → (Đã hậu kiểm) |
 | SKU | Chưa học → Đang học (thuộc đợt đang xử lý) → Đã học; rollback về Chưa học |
-| Đợt nhập | Nháp → Gán nhãn → Huấn luyện → Chờ duyệt → Đã deploy |
+| Đợt nhập | Nháp → Thu thập dữ liệu (ảnh mẫu và ảnh thật song song) → Huấn luyện → Chờ duyệt → Đã deploy |
 | Job | Chờ → Đang chạy → Đang đánh giá → Xong / Lỗi |
 | Phiên bản model | Chờ duyệt → Đang chạy → Đã thay thế; hoặc Bị từ chối |
 
@@ -331,7 +344,8 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | Dashboard, hậu kiểm | | ✓ | Xem | |
 | Danh mục SKU | Tra cứu khi quét | ✓ | Xem | |
 | Tạo đợt nhập | | ✓ | | |
-| Gán nhãn, gửi huấn luyện | | | ✓ | |
+| Tải ảnh mẫu | | ✓ | ✓ | |
+| Duyệt ảnh cắt, tạo ảnh ghép, gán nhãn ảnh thật, gửi huấn luyện | | | ✓ | |
 | Job, phiên bản model, giám sát | | Xem | ✓ | |
 | Deploy / rollback, ngưỡng | | | ✓ | |
 | Người dùng, quầy/camera, lưu dữ liệu | | | | ✓ |
@@ -360,17 +374,18 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | US14 | Quản lý | hậu kiểm cảnh báo đã đóng | phát hiện gian lận lặp lại | UC14 |
 | US15 | Quản lý | quản lý SKU và thấy trạng thái nhận diện | danh mục luôn đúng | UC15 |
 | US16 | Quản lý | tạo đợt nhập và theo dõi tiến độ | biết khi nào camera kiểm tra được hàng mới | UC16 |
-| US17 | Kỹ sư ML | model đề xuất box hàng cũ, tôi chỉ vẽ hàng mới | gán nhãn một đợt nhanh hơn | UC17 |
-| US18 | Kỹ sư ML | xem tiến độ dữ liệu từng SKU và gửi huấn luyện khi đủ | không huấn luyện với dữ liệu thiếu | UC18 |
-| US19 | Kỹ sư ML | theo dõi trạng thái và log của job | biết job chạy đến đâu, lỗi gì | UC19 |
-| US20 | Kỹ sư ML | so sánh phiên bản mới với bản đang chạy theo cổng duyệt | chỉ deploy model không kém hơn | UC20 |
-| US21 | Kỹ sư ML | deploy hoặc rollback có xác nhận | cập nhật quầy an toàn | UC21 |
-| US22 | Kỹ sư ML | chỉnh ngưỡng và xem trước tác động | cân bằng bắt sót và báo nhầm | UC22 |
-| US23 | Kỹ sư ML | xem chất lượng model ngoài thực tế | biết khi nào cần cải thiện | UC23 |
-| US24 | Quản trị viên | tạo, sửa, khóa tài khoản | kiểm soát truy cập | UC24 |
-| US25 | Quản trị viên | quản lý quầy, camera, chụp thử | quầy luôn sẵn sàng | UC25 |
-| US26 | Quản trị viên | xem nhật ký thao tác quan trọng | truy vết sự cố | UC26 |
-| US27 | Quản trị viên | cấu hình thời gian lưu ảnh | tuân thủ chính sách dữ liệu | UC27 |
+| US17 | Kỹ sư ML | duyệt ảnh mẫu đã cắt nền tự động rồi tạo ảnh ghép | có dữ liệu huấn luyện cho hàng mới mà không phải vẽ box | UC17 |
+| US18 | Kỹ sư ML | model đề xuất box hàng cũ trên ảnh khay thật, tôi chỉ vẽ hàng mới | có tập kiểm tra thật nhanh, nhãn đủ cả hàng cũ | UC18 |
+| US19 | Kỹ sư ML | xem tiến độ dữ liệu từng SKU và gửi huấn luyện khi đủ | không huấn luyện với dữ liệu thiếu | UC19 |
+| US20 | Kỹ sư ML | theo dõi trạng thái và log của job | biết job chạy đến đâu, lỗi gì | UC20 |
+| US21 | Kỹ sư ML | so sánh phiên bản mới với bản đang chạy theo cổng duyệt | chỉ deploy model không kém hơn | UC21 |
+| US22 | Kỹ sư ML | deploy hoặc rollback có xác nhận | cập nhật quầy an toàn | UC22 |
+| US23 | Kỹ sư ML | chỉnh ngưỡng và xem trước tác động | cân bằng bắt sót và báo nhầm | UC23 |
+| US24 | Kỹ sư ML | xem chất lượng model ngoài thực tế | biết khi nào cần cải thiện | UC24 |
+| US25 | Quản trị viên | tạo, sửa, khóa tài khoản | kiểm soát truy cập | UC25 |
+| US26 | Quản trị viên | quản lý quầy, camera, chụp thử | quầy luôn sẵn sàng | UC26 |
+| US27 | Quản trị viên | xem nhật ký thao tác quan trọng | truy vết sự cố | UC27 |
+| US28 | Quản trị viên | cấu hình thời gian lưu ảnh | tuân thủ chính sách dữ liệu | UC28 |
 
 ### 9.2 Tiêu chí chấp nhận
 
@@ -392,17 +407,18 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | US14 | Lọc theo loại, mức, cách xử lý, thu ngân · Đánh dấu: Cảnh báo đúng / Báo nhầm thật / Nghi gian lận · Thống kê theo thu ngân |
 | US15 | Mã vạch không trùng, giá > 0 · SKU mới ở trạng thái Chưa học · Đổi giá không ảnh hưởng giao dịch cũ |
 | US16 | Đợt gồm các SKU Chưa học · Tiến trình 5 bước có thời gian |
-| US17 | Đề xuất nét đứt có độ tin · Nút chấp nhận hàng loạt ≥ 0,7 · Vẽ box bằng kéo chuột · Cảnh báo khi số box khác số lượng theo mã vạch · Thống kê % đề xuất được chấp nhận |
-| US18 | Bảng box đã duyệt / mục tiêu theo SKU · Nút "Gửi huấn luyện" chỉ bật khi đạt BR-11 |
-| US19 | Danh sách job: trạng thái, tiến độ, giờ GPU, thời gian · Xem log |
-| US20 | Bảng điều kiện BR-09: giá trị mới, giá trị bản đang chạy, Đạt / Không đạt |
-| US21 | Xác nhận lần hai; không đạt cổng thì bắt buộc ghi lý do · Sau deploy, SKU của đợt thành Đã học · Rollback đưa về Chưa học |
-| US22 | Kéo ngưỡng → thấy ngay bắt sót, báo nhầm, % tự nhận · Lưu tạo cấu hình mới, hoàn tác được |
-| US23 | Biểu đồ theo ngày: tỉ lệ cảnh báo, báo nhầm · Cặp SKU hay nhầm · Độ trễ |
-| US24 | Email không trùng · Khóa/mở khóa · Không tự khóa chính mình |
-| US25 | Thêm quầy, gán camera · "Chụp thử" hiện ảnh hoặc lỗi kết nối |
-| US26 | Ghi: đăng nhập, PIN, xóa dòng, hủy, đổi giá, deploy/rollback, đổi ngưỡng, đổi quyền · Không sửa / xóa được |
-| US27 | Cấu hình số ngày giữ ảnh · Hiện dung lượng đang dùng |
+| US17 | Mỗi SKU mới: ảnh cắt kèm trạng thái Chờ duyệt / Cần xem kỹ / Nhận / Loại · Nút nhận hàng loạt ảnh rõ · Đếm ảnh đã nhận / mục tiêu · "Tạo ảnh ghép" chỉ bật khi mọi SKU đủ ảnh |
+| US18 | Ảnh ghi nguồn · Đề xuất nét đứt có độ tin · Chấp nhận hàng loạt ≥ 0,7 · Vẽ box bằng kéo chuột · Đề xuất dưới box vẽ tự bị thay · Không lưu khi còn đề xuất chưa duyệt · Hỏi lại khi số box khác số lượng theo mã vạch · Thống kê % đề xuất được chấp nhận |
+| US19 | Bảng theo SKU: ảnh mẫu đã nhận, box trong tập kiểm tra · Nút "Gửi huấn luyện" chỉ bật khi đạt BR-11 · Tùy chọn trộn ảnh thật vượt mức (BR-16), ghi vào log job |
+| US20 | Danh sách job: trạng thái, tiến độ, giờ GPU, thời gian · Xem log |
+| US21 | Bảng điều kiện BR-09: giá trị mới, giá trị bản đang chạy, Đạt / Không đạt |
+| US22 | Xác nhận lần hai; không đạt cổng thì bắt buộc ghi lý do · Sau deploy, SKU của đợt thành Đã học · Rollback đưa về Chưa học |
+| US23 | Kéo ngưỡng → thấy ngay bắt sót, báo nhầm, % tự nhận · Lưu tạo cấu hình mới, hoàn tác được |
+| US24 | Biểu đồ theo ngày: tỉ lệ cảnh báo, báo nhầm · Cặp SKU hay nhầm · Độ trễ |
+| US25 | Email không trùng · Khóa/mở khóa · Không tự khóa chính mình |
+| US26 | Thêm quầy, gán camera · "Chụp thử" hiện ảnh hoặc lỗi kết nối |
+| US27 | Ghi: đăng nhập, PIN, xóa dòng, hủy, đổi giá, deploy/rollback, đổi ngưỡng, đổi quyền · Không sửa / xóa được |
+| US28 | Cấu hình số ngày giữ ảnh · Hiện dung lượng đang dùng |
 
 ### 9.3 Đánh giá INVEST
 
@@ -412,7 +428,7 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | **N**egotiable | Bố cục giao diện đổi được; mục tiêu và quyền giữ nguyên |
 | **V**aluable | Mỗi story ghi rõ giá trị ở cột "Để…" |
 | **E**stimable | Đầu vào, đầu ra, vai trò và trường hợp lỗi đã nêu trong UC và tiêu chí |
-| **S**mall | Mỗi story một chức năng. US17 lớn nhất, khi code tách thành 17a (duyệt đề xuất) và 17b (vẽ box) |
+| **S**mall | Mỗi story một chức năng. US18 lớn nhất, khi code tách thành 18a (duyệt đề xuất) và 18b (vẽ box) |
 | **T**estable | Mọi story có tiêu chí chấp nhận quan sát được ở mục 9.2 |
 
 Ràng buộc chung cho mọi story: phân quyền ở backend, thao tác nhạy cảm vào nhật ký, mọi màn có trạng thái đang tải / rỗng / lỗi.

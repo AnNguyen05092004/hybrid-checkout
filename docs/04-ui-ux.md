@@ -1,6 +1,6 @@
 # Bước 4 — UI/UX
 
-Prototype chạy được ở [`frontend/`](../frontend/): React + TypeScript + Vite, dữ liệu giả lập, đủ 25 màn hình của [IA](03-information-architecture.md).
+Prototype chạy được ở [`frontend/`](../frontend/): React + TypeScript + Vite, dữ liệu giả lập, đủ 27 màn hình và hộp thoại của [IA](03-information-architecture.md).
 
 ## 1. Nguyên tắc thiết kế
 
@@ -53,7 +53,7 @@ Font **Be Vietnam Pro** (dấu tiếng Việt rõ); số tiền dùng `tabular-n
 
 **Làn nhanh:** Nhận diện khay → món xanh tự vào giỏ → quét món cam và món không có khung → tích "đã quét hết" → Thanh toán.
 
-**Trợ lý gán nhãn:** Quản lý tạo đợt → Kỹ sư ML duyệt đề xuất, vẽ hàng mới → đủ dữ liệu → Gửi huấn luyện → Chờ duyệt → Deploy → quầy nhận diện được hàng mới.
+**Trợ lý gán nhãn:** Quản lý tạo đợt → song song hai nhánh: *ảnh mẫu → duyệt ảnh cắt → tạo ảnh ghép* (dữ liệu huấn luyện) và *ảnh thật → duyệt đề xuất, vẽ hàng mới* (tập kiểm tra) → Gửi huấn luyện → cổng duyệt đo trên ảnh thật → Deploy → quầy nhận diện được hàng mới.
 
 ## 5. Màn hình
 
@@ -86,11 +86,15 @@ Món chắc chắn tự vào giỏ (nguồn **Camera**); món không chắc có 
 ![Danh mục SKU](images/ui/22-skus.png)
 
 ### Đợt nhập và Trợ lý gán nhãn
-Chi tiết đợt có tiến trình 5 bước và tiến độ dữ liệu từng SKU; **Gửi huấn luyện** chỉ bật khi đủ.
+Chi tiết đợt có tiến trình 5 bước, tiến độ từng SKU theo hai loại dữ liệu và hai thẻ việc cần làm; **Gửi huấn luyện** chỉ bật khi đủ.
 
 ![Đợt nhập](images/ui/11-batch5.png)
 
-Màn gán nhãn 3 cột: hàng mới cần vẽ (theo mã vạch) · ảnh · danh sách box. Đề xuất độ tin thấp được gắn "Cần xem kỹ".
+Ảnh mẫu: lưới ảnh đã cắt nền của từng SKU mới, nhận hoặc loại; đủ ảnh thì **Tạo ảnh ghép**.
+
+![Ảnh mẫu](images/ui/11b-samples.png)
+
+Gán nhãn ảnh thật, 3 cột: hàng mới cần vẽ (theo mã vạch) · ảnh · danh sách box. Đề xuất độ tin thấp gắn "Cần xem kỹ"; đề xuất nằm dưới box vẽ tay tự thành "Thay bằng box vẽ".
 
 ![Gán nhãn](images/ui/13-labeling-filled.png)
 ![Đợt sau huấn luyện](images/ui/14-batch5-trained.png)
@@ -136,7 +140,8 @@ npm run lint
 
 Giới hạn:
 - Dữ liệu nằm trong bộ nhớ trình duyệt: **tải lại trang (F5) là mất trạng thái**. Chuyển trang bằng menu thì giữ nguyên.
-- Nhận diện là mô phỏng: dùng box thật của ảnh mẫu; hàng chưa học bị bỏ sót hoặc bị đoán thành hàng cũ cùng nhóm, giống model thật.
+- Ảnh khay là **ảnh ghép** từ bộ mẫu của model (có sẵn box), dùng thay cho ảnh camera, kể cả ở màn gán nhãn ảnh thật. Ảnh mẫu của SKU là ảnh cắt từ chính các ảnh ghép đó.
+- Nhận diện là mô phỏng: dùng box có sẵn của ảnh; hàng chưa học bị bỏ sót hoặc bị đoán thành hàng cũ cùng nhóm, giống model thật.
 - Huấn luyện mô phỏng khoảng 10 giây; số liệu AP50, cAcc của các phiên bản là kết quả đánh giá thật của model.
 - PIN quản lý demo: `246810`.
 
@@ -146,7 +151,7 @@ Giới hạn:
 2. **Kiểm tra chéo:** quét thiếu 1 món → Kiểm tra khay → cảnh báo đỏ → Quét món đó → Thanh toán.
 3. **Tráo mã:** bấm "Tráo" ở một món → Kiểm tra khay → Yêu cầu quản lý → nhập PIN.
 4. **Làn nhanh:** chọn khay "có hàng mới" → Nhận diện → quét các món cam → Thanh toán.
-5. **Kỹ sư ML** → Đợt nhập → Đợt 5 → Bắt đầu gán nhãn → chấp nhận đề xuất, vẽ hàng mới (hoặc "Điền box mẫu") → lưu 4 ảnh.
+5. **Kỹ sư ML** → Đợt nhập → Đợt 5 → **Mở ảnh mẫu** → nhận ảnh cho 5 SKU còn thiếu → **Tạo ảnh ghép** → về đợt → **Gán nhãn ảnh thật** → chấp nhận đề xuất, vẽ hàng mới (hoặc "Điền box mẫu") → lưu 4 ảnh.
 6. **Gửi huấn luyện** → đợi job xong → Phiên bản model → v5 → **Deploy**.
 7. **Thu ngân** → Làn nhanh với khay đó: hàng mới giờ được tự nhận.
 
@@ -157,7 +162,7 @@ Giới hạn:
 | S01–S03 | `features/auth/*` |
 | P01–P06 | `features/pos/*` — logic ở `useCheckout.ts`, giao diện chia trong `components/` |
 | M01–M08 | `features/store/*` |
-| L01–L06 | `features/ml/*` |
+| L01–L07 | `features/ml/*` |
 | A01–A04 | `features/admin/*` |
 | Đối chiếu khay (UC07) | `lib/reconcile.ts` + `lib/reconcile.test.ts` |
 

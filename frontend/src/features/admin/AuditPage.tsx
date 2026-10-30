@@ -3,7 +3,7 @@ import { useStore } from "../../app/store";
 import { Card, Empty, PageHeader } from "../../components/ui";
 import { dateTime } from "../../lib/format";
 
-/** A03 — Audit log (US26). Read only. */
+/** A03 — Audit log (US27). Read only. */
 export function AuditPage() {
   const { audit } = useStore();
   const [who, setWho] = useState("ALL");

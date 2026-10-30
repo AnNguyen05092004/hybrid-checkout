@@ -7,7 +7,12 @@ Reads (never writes) the model repo:
 Writes:
   frontend/src/mocks/generated/skus.json     200 SKU (rpc id, category, task)
   frontend/src/mocks/generated/samples.json  chosen trays, boxes normalised to 0..1
+  frontend/src/mocks/generated/cutouts.json  product cutouts of the batch-5 SKU, per SKU
   frontend/public/samples/*.jpg              trays resized to 960 px (gitignored, CC BY-NC-SA 4.0)
+  frontend/public/samples/cutouts/*.jpg      one crop per distinct cutout, 220 px (same licence)
+
+The sample trays are composites (product cutouts pasted on a tray background), so each box crop
+shows one cutout; the prototype uses these crops as the "sample photos" of a new SKU.
 
 Usage:
   python3 scripts/prepare_samples.py --model-repo <path to the model repo>
@@ -25,6 +30,9 @@ SIZE = 960
 # trays of task 5 hold the new SKUs of the batch being labelled.
 PICKS = [(1, "easy", 2), (1, "medium", 1), (2, "medium", 1), (3, "easy", 1), (4, "medium", 1),
          (5, "easy", 2), (5, "medium", 2)]
+CUTOUT_TASK = 5
+CUTOUTS_PER_SKU = 10
+CUTOUT_SIZE = 220
 
 
 def main():
@@ -67,11 +75,42 @@ def main():
                 ],
             })
 
+    cutouts = crop_cutouts(sample_dir, task_of, ROOT / "frontend/public/samples/cutouts")
+
     out_data = ROOT / "frontend/src/mocks/generated"
     out_data.mkdir(parents=True, exist_ok=True)
     (out_data / "skus.json").write_text(json.dumps(skus, indent=1))
     (out_data / "samples.json").write_text(json.dumps(samples, indent=1))
-    print(f"{len(skus)} SKU, {len(samples)} trays -> {out_data}, {out_images}")
+    (out_data / "cutouts.json").write_text(json.dumps(cutouts, indent=1))
+    print(f"{len(skus)} SKU, {len(samples)} trays, "
+          f"{sum(len(v) for v in cutouts.values())} cutouts -> {out_data}, {out_images}")
+
+
+def crop_cutouts(sample_dir, task_of, out_dir):
+    """Crop up to CUTOUTS_PER_SKU distinct, fully visible cutouts of every SKU of CUTOUT_TASK."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ann = json.loads((sample_dir / f"annotations/task_{CUTOUT_TASK}.json").read_text())
+    image_of = {i["id"]: i for i in ann["images"]}
+    seen, cutouts = set(), {}
+    for a in sorted(ann["annotations"], key=lambda a: a["id"]):
+        sku_id = a["category_id"]
+        files = cutouts.setdefault(sku_id, [])
+        if (task_of.get(sku_id) != CUTOUT_TASK or a["visible_fraction"] < 0.97
+                or a["cutout_id"] in seen or len(files) >= CUTOUTS_PER_SKU):
+            continue
+        seen.add(a["cutout_id"])
+        image = image_of[a["image_id"]]
+        x, y, w, h = a["bbox"]
+        pad = round(max(w, h) * 0.05)
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1, y1 = min(image["width"], x + w + pad), min(image["height"], y + h + pad)
+        name = f"{sku_id}_{len(files)}.jpg"
+        subprocess.run(["sips", "-c", str(y1 - y0), str(x1 - x0), "--cropOffset", str(y0), str(x0),
+                        str(sample_dir / image["file_name"]), "--out", str(out_dir / name)],
+                       check=True, capture_output=True)
+        subprocess.run(["sips", "-Z", str(CUTOUT_SIZE), str(out_dir / name)], check=True, capture_output=True)
+        files.append(f"samples/cutouts/{name}")
+    return {k: v for k, v in sorted(cutouts.items()) if v}
 
 
 if __name__ == "__main__":

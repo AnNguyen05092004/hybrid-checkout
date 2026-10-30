@@ -80,7 +80,7 @@ export function TransactionDetailPage() {
               })}</tbody>
             </table></div>
           </Card>
-          {(canReview || user?.role === "ML_ENGINEER") && <button className="btn" onClick={() => toast("Đã gửi ảnh khay sang hàng đợi dữ liệu của đợt nhập.")}>Dùng ảnh này cho giám sát / đợt nhập</button>}
+          {(canReview || user?.role === "ML_ENGINEER") && <button className="btn" onClick={() => toast("Đã thêm ảnh khay vào hàng đợi ảnh khó. Kỹ sư ML gán nhãn ở đợt nhập tới.")}>Gửi vào hàng đợi ảnh khó</button>}
         </div>
       </div>
     </>

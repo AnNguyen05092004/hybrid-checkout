@@ -64,7 +64,7 @@ export interface Transaction {
 }
 
 export type BatchStatus =
-  | "NHAP" | "DANG_GAN_NHAN" | "CHO_HUAN_LUYEN" | "DANG_HUAN_LUYEN" | "CHO_DUYET" | "DA_DEPLOY";
+  | "NHAP" | "THU_THAP" | "DANG_HUAN_LUYEN" | "CHO_DUYET" | "DA_DEPLOY";
 
 export interface Batch {
   id: number;
@@ -127,7 +127,7 @@ export const PAST_BATCHES: Batch[] = [
   { id: 2, name: "Đợt nhập 2 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-22T10:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-24T10:00:00+07:00" },
   { id: 3, name: "Đợt nhập 3 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-23T14:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-25T08:00:00+07:00" },
   { id: 4, name: "Đợt nhập 4 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-24T15:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-26T12:00:00+07:00" },
-  { id: 5, name: "Đợt nhập 5 — 25 SKU", status: "DANG_GAN_NHAN", createdAt: "2026-10-28T09:00:00+07:00", createdBy: "Lê Quốc Bảo" },
+  { id: 5, name: "Đợt nhập 5 — 25 SKU", status: "THU_THAP", createdAt: "2026-10-28T09:00:00+07:00", createdBy: "Lê Quốc Bảo" },
 ];
 
 export const PAST_JOBS: Job[] = MODEL_VERSIONS.slice(0, 4).map((v) => ({

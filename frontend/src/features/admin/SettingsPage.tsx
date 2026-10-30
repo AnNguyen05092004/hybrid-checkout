@@ -3,7 +3,7 @@ import { useStore } from "../../app/store";
 import { Card, PageHeader } from "../../components/ui";
 import { GATE } from "../../mocks/models";
 
-/** A04 — Data retention and default gates (US27, BR-09, BR-11, BR-13). */
+/** A04 — Data retention and default gates (US28, BR-09, BR-11, BR-13). */
 export function SettingsPage() {
   const { retention, setRetention, toast, log } = useStore();
   const [draft, setDraft] = useState(retention);

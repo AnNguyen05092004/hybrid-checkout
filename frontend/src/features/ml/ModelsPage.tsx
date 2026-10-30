@@ -5,7 +5,7 @@ import { Lines } from "../../components/charts";
 import { date, pct } from "../../lib/format";
 import { GATE, MODEL_VERSIONS } from "../../mocks/models";
 
-/** L03 — Model versions (US20). */
+/** L04 — Model versions (US21). */
 export function ModelsPage() {
   const { versionStatus, versionCreatedAt, activeBatch } = useStore();
   const navigate = useNavigate();

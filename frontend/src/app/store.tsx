@@ -4,12 +4,14 @@
  */
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { SKUS, type Sku } from "../mocks/catalog";
+import { CUTOUTS } from "../mocks/cutouts";
 import { MODEL_VERSIONS } from "../mocks/models";
 import {
   COUNTERS, PAST_AUDIT, PAST_BATCHES, PAST_JOBS, SEED_TRANSACTIONS, USERS,
   type AuditEntry, type Batch, type Job, type Transaction, type User,
 } from "../mocks/seed";
 import { TRAYS } from "../mocks/trays";
+import { CUTOUT_REVIEW_BELOW } from "./rules";
 
 export type LearnStatus = "DA_HOC" | "DANG_HOC" | "CHUA_HOC";
 export type VersionStatus = "ACTIVE" | "SAN_SANG" | "DA_THAY_THE" | "BI_TU_CHOI" | "CHUA_CO";
@@ -18,6 +20,13 @@ export interface Thresholds {
   alert: number;
   auto: number;
   low: number;
+}
+
+export type CutoutState = "accepted" | "rejected";
+
+export interface Composites {
+  status: "NONE" | "RUNNING" | "DONE";
+  count: number;
 }
 
 export interface Shift {
@@ -35,6 +44,24 @@ function initialApproved(): Record<number, number> {
   return Object.fromEntries(
     SKUS.filter((s) => s.task === 5).map((s) => [s.id, inQueue.has(s.id) ? 21 - inQueue.get(s.id)! : 20 + (s.id % 9)]));
 }
+
+/**
+ * Cutout review of batch 5 before this session: the first 20 SKU are done (the worst flagged cutout
+ * rejected), the last 5 are still waiting so the demo has work left.
+ */
+function initialCutoutState(): Record<string, CutoutState> {
+  const batchSkus = [...new Set(CUTOUTS.map((c) => c.skuId))].sort((a, b) => a - b).slice(0, 20);
+  const out: Record<string, CutoutState> = {};
+  batchSkus.forEach((skuId) => {
+    const own = CUTOUTS.filter((c) => c.skuId === skuId);
+    const worst = own.reduce((a, b) => (b.quality < a.quality ? b : a));
+    own.forEach((c) => (out[c.id] = c === worst && c.quality < CUTOUT_REVIEW_BELOW ? "rejected" : "accepted"));
+  });
+  return out;
+}
+
+/** Size of one batch of composites in the model's synthetic set (71,642 images over 5 batches). */
+const COMPOSITES_PER_BATCH = 14328;
 
 interface Store {
   user: User | null;
@@ -61,7 +88,12 @@ interface Store {
   approved: Record<number, number>;
   valImages: number;
   saveLabels: (trayId: string, counts: Record<number, number>) => void;
-  startTraining: (batchId: number) => void;
+  cutoutState: Record<string, CutoutState>;
+  setCutoutState: (ids: string[], state: CutoutState) => void;
+  composites: Composites;
+  generateComposites: (batchId: number) => void;
+  /** extraReal: real images above the validation target mixed into training (BR-16). */
+  startTraining: (batchId: number, extraReal: number) => void;
   jobs: Job[];
 
   thresholds: Record<number, Thresholds>;
@@ -111,6 +143,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [labeledTrays, setLabeledTrays] = useState<string[]>([]);
   const [approved, setApproved] = useState<Record<number, number>>(initialApproved);
   const [valImages, setValImages] = useState(48);
+  const [cutoutState, setCutoutStates] = useState(initialCutoutState);
+  const [composites, setComposites] = useState<Composites>({ status: "NONE", count: 0 });
   const [jobs, setJobs] = useState<Job[]>(PAST_JOBS);
   const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
   const [transactions, setTransactions] = useState<Transaction[]>(SEED_TRANSACTIONS);
@@ -143,7 +177,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         if (j.status === "DANG_CHAY" && j.epoch < j.epochs) {
           return { ...j, epoch: j.epoch + 1, gpuHours: +(j.gpuHours + 5.9 / 16).toFixed(2), log: [...j.log, `Epoch ${j.epoch + 1}/${j.epochs} xong`] };
         }
-        if (j.status === "DANG_CHAY") return { ...j, status: "DANG_DANH_GIA", log: [...j.log, "Đánh giá trên tập val của các đợt 1–5"] };
+        if (j.status === "DANG_CHAY") return { ...j, status: "DANG_DANH_GIA", log: [...j.log, "Đánh giá trên tập kiểm tra ảnh thật của các đợt 1–5"] };
         return { ...j, status: "XONG", finishedAt: new Date().toISOString(), log: [...j.log, "Đăng ký phiên bản v5 — chờ duyệt"] };
       }));
       if (running.status === "DANG_DANH_GIA") {
@@ -226,14 +260,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       });
       setValImages((n) => n + 1);
     },
-    startTraining: (batchId) => {
+    cutoutState,
+    setCutoutState: (ids, state) => setCutoutStates((all) => ({ ...all, ...Object.fromEntries(ids.map((id) => [id, state])) })),
+    composites,
+    generateComposites: (batchId) => {
+      setComposites({ status: "RUNNING", count: 0 });
+      setTimeout(() => {
+        setComposites({ status: "DONE", count: COMPOSITES_PER_BATCH });
+        toast(`Đã tạo ${COMPOSITES_PER_BATCH.toLocaleString("vi-VN")} ảnh ghép cho đợt ${batchId}.`);
+      }, 2500);
+      log("GENERATE_COMPOSITES", `Đợt ${batchId}`, "Tạo ảnh ghép từ ảnh mẫu đã duyệt");
+    },
+    startTraining: (batchId, extraReal) => {
       setBatchStatus(batchId, "DANG_HUAN_LUYEN");
+      const data = `Dữ liệu: ${composites.count.toLocaleString("vi-VN")} ảnh ghép`
+        + (extraReal ? ` + ${extraReal} ảnh thật vượt mức tập kiểm tra` : "");
       setJobs((js) => [{
         id: `JOB-${batchId}0${batchId}`, batch: batchId, type: "TRAIN", status: "DANG_CHAY", epoch: 0, epochs: 16,
         gpuHours: 0, startedAt: new Date().toISOString(),
-        log: ["Mô phỏng: dùng checkpoint có sẵn của đợt 5", "Khởi động trên GPU"],
+        log: ["Mô phỏng: dùng checkpoint có sẵn của đợt 5", data, "Khởi động trên GPU"],
       }, ...js]);
-      log("START_TRAINING", `Đợt ${batchId}`, "Gửi huấn luyện đợt");
+      log("START_TRAINING", `Đợt ${batchId}`, extraReal ? `Gửi huấn luyện, trộn ${extraReal} ảnh thật` : "Gửi huấn luyện");
       toast(`Đã gửi huấn luyện đợt ${batchId}.`);
     },
     jobs,

@@ -4,7 +4,7 @@ import { useStore } from "../../app/store";
 import { Badge, Card, Modal, PageHeader } from "../../components/ui";
 import { TRAYS } from "../../mocks/trays";
 
-/** A02 — Counters and cameras (US25). */
+/** A02 — Counters and cameras (US26). */
 export function CountersPage() {
   const { counters, shift, toast } = useStore();
   const [testing, setTesting] = useState<string | null>(null);

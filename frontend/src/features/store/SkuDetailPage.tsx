@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useStore } from "../../app/store";
 import { Badge, Card, Empty, LearnBadge, PageHeader } from "../../components/ui";
 import { money } from "../../lib/format";
+import { cutoutsOf } from "../../mocks/cutouts";
 import { CONFUSED_PAIRS } from "../../mocks/models";
 import { TRAYS } from "../../mocks/trays";
 
@@ -15,6 +16,7 @@ export function SkuDetailPage() {
   if (!s) return <Empty title="Không tìm thấy SKU"><Link to="/skus">Về danh mục</Link></Empty>;
   const canEdit = user?.role === "STORE_MANAGER";
   const confused = CONFUSED_PAIRS.filter((p) => p.from === s.id || p.to === s.id);
+  const cutouts = cutoutsOf(s.id).slice(0, 6);
   const example = TRAYS.flatMap((t) => t.objects.map((o) => ({ t, o }))).find((x) => x.o.rpcId === s.id);
 
   return (
@@ -53,7 +55,9 @@ export function SkuDetailPage() {
           </div>
         </Card>
         <Card title="Ảnh mẫu">
-          {example ? (
+          {cutouts.length > 0 ? (
+            <div className="cutouts">{cutouts.map((c) => <figure key={c.id} className="cutout"><img src={`/${c.file}`} alt={s.name} loading="lazy" /></figure>)}</div>
+          ) : example ? (
             <div style={{ position: "relative", overflow: "hidden", borderRadius: 8, aspectRatio: "1 / 1", background: "#1e293b" }}>
               <img src={`/${example.t.file}`} alt={s.name} style={{
                 position: "absolute", width: `${100 / example.o.box[2]}%`, left: `${(-example.o.box[0] / example.o.box[2]) * 100}%`, top: `${(-example.o.box[1] / example.o.box[2]) * 100}%`,

@@ -1,29 +1,62 @@
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, ImagePlus, Tag } from "lucide-react";
+import { Check, Circle, Images, Tag } from "lucide-react";
 import { useStore } from "../../app/store";
+import { MIN_CUTOUTS, MIN_VAL_BOXES, MIN_VAL_IMAGES } from "../../app/rules";
 import { BATCH_STEPS, Badge, BatchBadge, Card, Empty, JobBadge, PageHeader, Progress, Stat, VersionBadge } from "../../components/ui";
 import { date, dateTime } from "../../lib/format";
+import { cutoutsOf } from "../../mocks/cutouts";
 
-const MIN_BOXES = 20; // BR-11
-const MIN_VAL = 50;
+function Meter({ n, target }: { n: number; target: number }) {
+  return (
+    <div className="row">
+      <div style={{ flex: 1 }}><Progress value={(n / target) * 100} tone={n >= target ? "ok" : "warn"} /></div>
+      <span className="small num" style={{ width: 48 }}>{n >= target ? `${n} ✓` : `${n}/${target}`}</span>
+    </div>
+  );
+}
 
-/** M08 — Batch detail: pipeline, data progress per SKU, send to training (US16, US18). */
+function Condition({ ok, children }: { ok: boolean; children: string }) {
+  return (
+    <div className="row small" style={{ color: ok ? "var(--ok)" : "var(--text-2)" }}>
+      {ok ? <Check size={14} /> : <Circle size={14} />}{children}
+    </div>
+  );
+}
+
+/** M08 — Batch detail: pipeline, data progress per SKU, send to training (US16, US19). */
 export function BatchDetailPage() {
   const { id } = useParams();
-  const store = useStore();
-  const { batches, skus, approved, valImages, labelQueue, labeledTrays, jobs, user, startTraining, versionStatus } = store;
+  const {
+    batches, skus, approved, valImages, labelQueue, labeledTrays, jobs, user, startTraining, versionStatus,
+    cutoutState, composites,
+  } = useStore();
   const navigate = useNavigate();
+  const [mixReal, setMixReal] = useState(false);
   const b = batches.find((x) => x.id === Number(id));
   if (!b) return <Empty title="Không tìm thấy đợt nhập"><Link to="/batches">Về danh sách</Link></Empty>;
 
-  const items = skus.filter((s) => s.task === b.id);
+  // Batch 5 is live in the prototype; earlier batches show their final numbers.
   const isCurrent = b.id === 5;
-  const counts = items.map((s) => ({ s, n: b.status === "DA_DEPLOY" && !isCurrent ? 20 + (s.id % 15) : isCurrent ? approved[s.id] ?? 0 : 0 }));
-  const val = isCurrent ? valImages : b.status === "DA_DEPLOY" ? 60 + b.id * 3 : 0;
-  const ready = counts.length > 0 && counts.every((c) => c.n >= MIN_BOXES) && val >= MIN_VAL;
-  const stepIndex = BATCH_STEPS.findIndex((s) => s.status === (b.status === "CHO_HUAN_LUYEN" ? "DANG_GAN_NHAN" : b.status));
+  const finished = b.status !== "NHAP" && b.status !== "THU_THAP";
+  const rows = skus.filter((s) => s.task === b.id).map((s) => ({
+    s,
+    cutouts: isCurrent ? cutoutsOf(s.id).filter((c) => cutoutState[c.id] === "accepted").length : finished ? 9 + (s.id % 4) : 0,
+    boxes: isCurrent ? approved[s.id] ?? 0 : finished ? 20 + (s.id % 15) : 0,
+  }));
+  const val = isCurrent ? valImages : finished ? 60 + b.id * 3 : 0;
+  const compositeCount = isCurrent ? composites.count : finished ? 14328 : 0;
+
+  const cutoutsOk = rows.length > 0 && rows.every((r) => r.cutouts >= MIN_CUTOUTS);
+  const compositesOk = compositeCount > 0;
+  const valOk = val >= MIN_VAL_IMAGES && rows.length > 0 && rows.every((r) => r.boxes >= MIN_VAL_BOXES);
+  const ready = cutoutsOk && compositesOk && valOk;
+  const surplus = Math.max(0, val - MIN_VAL_IMAGES);
+
+  const stepIndex = BATCH_STEPS.findIndex((s) => s.status === b.status);
   const job = jobs.find((j) => j.batch === b.id);
   const isML = user?.role === "ML_ENGINEER";
+  const collecting = isCurrent && b.status === "THU_THAP";
   const vid = `v${b.id}`;
   const remaining = labelQueue.length - labeledTrays.length;
 
@@ -41,48 +74,60 @@ export function BatchDetailPage() {
         </div>
       </Card>
       <div className="stats">
-        <Stat label="SKU trong đợt" value={items.length} />
-        <Stat label="SKU đủ dữ liệu" value={`${counts.filter((c) => c.n >= MIN_BOXES).length}/${items.length}`} hint={`mục tiêu ≥ ${MIN_BOXES} box đã duyệt / SKU`} />
-        <Stat label="Ảnh val của đợt" value={val} hint={`mục tiêu ≥ ${MIN_VAL} ảnh khay thật`} />
-        {isCurrent && <Stat label="Ảnh chờ gán nhãn" value={Math.max(0, remaining)} hint="trong hàng đợi của phiên này" />}
+        <Stat label="SKU trong đợt" value={rows.length} />
+        <Stat label="SKU đủ ảnh mẫu" value={`${rows.filter((r) => r.cutouts >= MIN_CUTOUTS).length}/${rows.length}`} hint={`≥ ${MIN_CUTOUTS} ảnh cắt đã nhận / SKU`} />
+        <Stat label="Ảnh ghép (huấn luyện)" value={compositeCount ? compositeCount.toLocaleString("vi-VN") : "Chưa tạo"} />
+        <Stat label="Tập kiểm tra ảnh thật" value={`${val} ảnh`} hint={`mục tiêu ≥ ${MIN_VAL_IMAGES} ảnh, ≥ ${MIN_VAL_BOXES} box / SKU`} />
       </div>
       <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", alignItems: "start" }}>
         <Card title="Tiến độ dữ liệu theo SKU" bodyClass="">
-          {items.length === 0 ? <Empty title="Đợt chưa có SKU" /> : (
+          {rows.length === 0 ? <Empty title="Đợt chưa có SKU" /> : (
             <div className="table-wrap"><table className="table">
-              <thead><tr><th>SKU</th><th>Mã vạch</th><th style={{ width: "40%" }}>Box đã duyệt</th><th /></tr></thead>
-              <tbody>{counts.map(({ s, n }) => (
+              <thead><tr><th>SKU</th><th>Mã vạch</th><th style={{ width: "26%" }}>Ảnh mẫu đã nhận</th><th style={{ width: "26%" }}>Box trong tập kiểm tra</th><th /></tr></thead>
+              <tbody>{rows.map(({ s, cutouts, boxes }) => (
                 <tr key={s.id}>
                   <td><Link to={`/skus/${s.id}`}>{s.name}</Link></td><td className="mono">{s.barcode}</td>
-                  <td><div className="row"><div style={{ flex: 1 }}><Progress value={(n / MIN_BOXES) * 100} tone={n >= MIN_BOXES ? "ok" : "warn"} /></div><span className="small num" style={{ width: 48 }}>{n}/{MIN_BOXES}</span></div></td>
-                  <td>{n >= MIN_BOXES ? <Badge tone="ok">Đủ</Badge> : <Badge tone="warn">Thiếu {MIN_BOXES - n}</Badge>}</td>
+                  <td><Meter n={cutouts} target={MIN_CUTOUTS} /></td>
+                  <td><Meter n={boxes} target={MIN_VAL_BOXES} /></td>
+                  <td>{cutouts >= MIN_CUTOUTS && boxes >= MIN_VAL_BOXES ? <Badge tone="ok">Đủ</Badge> : <Badge tone="warn">Thiếu</Badge>}</td>
                 </tr>
               ))}</tbody>
             </table></div>
           )}
         </Card>
         <div className="col" style={{ gap: 16 }}>
-          {isCurrent && (b.status === "DANG_GAN_NHAN" || b.status === "CHO_HUAN_LUYEN") && (
-            <Card title="Gán nhãn">
+          {collecting && (
+            <Card title="1. Ảnh mẫu → ảnh ghép">
               <div className="col" style={{ gap: 10 }}>
-                <p className="small muted">Ảnh khay thật có chứa SKU mới (lấy từ giao dịch có mã vạch của SKU mới). Model đang chạy tự đề xuất box SKU cũ; chỉ cần vẽ box SKU mới.</p>
-                <div className="row small"><span>Đã gán {labeledTrays.length}/{labelQueue.length} ảnh trong hàng đợi</span></div>
-                <Progress value={(labeledTrays.length / labelQueue.length) * 100} />
-                {isML ? (
-                  <>
-                    <button className="btn primary" disabled={remaining <= 0} onClick={() => navigate(`/batches/${b.id}/label`)}><Tag size={16} /> {remaining > 0 ? "Bắt đầu gán nhãn" : "Đã gán hết hàng đợi"}</button>
-                    <button className="btn"><ImagePlus size={16} /> Tải ảnh bổ sung</button>
-                  </>
-                ) : <span className="small faint">Kỹ sư ML thực hiện bước này.</span>}
+                <p className="small muted">Chụp từng SKU mới, hệ thống cắt nền và ghép thành ảnh khay có sẵn box. Dùng để huấn luyện.</p>
+                <Condition ok={cutoutsOk}>Mọi SKU đủ ảnh mẫu</Condition>
+                <Condition ok={compositesOk}>Đã tạo ảnh ghép</Condition>
+                <button className="btn" onClick={() => navigate(`/batches/${b.id}/samples`)}><Images size={16} /> Mở ảnh mẫu</button>
               </div>
             </Card>
           )}
-          {isCurrent && (b.status === "DANG_GAN_NHAN" || b.status === "CHO_HUAN_LUYEN") && (
+          {collecting && (
+            <Card title="2. Ảnh thật → tập kiểm tra">
+              <div className="col" style={{ gap: 10 }}>
+                <p className="small muted">Ảnh khay từ giao dịch có quét mã hàng mới và ảnh khó gửi từ quầy. Model đề xuất box hàng cũ, người chỉ vẽ hàng mới. Dùng để duyệt model.</p>
+                <div className="small">Đã gán {labeledTrays.length}/{labelQueue.length} ảnh trong hàng đợi</div>
+                <Progress value={(labeledTrays.length / labelQueue.length) * 100} />
+                <Condition ok={valOk}>{`Tập kiểm tra ≥ ${MIN_VAL_IMAGES} ảnh, mỗi SKU ≥ ${MIN_VAL_BOXES} box`}</Condition>
+                {isML
+                  ? <button className="btn" disabled={remaining <= 0} onClick={() => navigate(`/batches/${b.id}/label`)}><Tag size={16} /> {remaining > 0 ? "Gán nhãn ảnh thật" : "Đã gán hết hàng đợi"}</button>
+                  : <span className="small faint">Kỹ sư ML thực hiện bước này.</span>}
+              </div>
+            </Card>
+          )}
+          {collecting && isML && (
             <Card title="Gửi huấn luyện">
               <div className="col" style={{ gap: 10 }}>
-                <p className="small muted">Chỉ gửi được khi mọi SKU mới có ≥ {MIN_BOXES} box đã duyệt và tập val ≥ {MIN_VAL} ảnh (BR-11).</p>
-                {isML ? <button className="btn primary" disabled={!ready} onClick={() => startTraining(b.id)}>Gửi huấn luyện</button> : null}
-                {!ready && <span className="small" style={{ color: "var(--warn)" }}>Chưa đủ dữ liệu.</span>}
+                <label className="row small" style={{ alignItems: "flex-start", color: surplus ? undefined : "var(--text-3)" }}>
+                  <input type="checkbox" checked={mixReal} disabled={!surplus} onChange={(e) => setMixReal(e.target.checked)} />
+                  <span>Trộn {surplus} ảnh thật vượt mức vào huấn luyện <span className="faint">(thí nghiệm, BR-16)</span></span>
+                </label>
+                <button className="btn primary" disabled={!ready} onClick={() => startTraining(b.id, mixReal ? surplus : 0)}>Gửi huấn luyện</button>
+                {!ready && <span className="small" style={{ color: "var(--warn)" }}>Chưa đủ dữ liệu (BR-11).</span>}
               </div>
             </Card>
           )}

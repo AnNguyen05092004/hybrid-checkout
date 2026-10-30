@@ -31,12 +31,14 @@ flowchart TB
     store --> M04["M04 Giao dịch"]
     M02 & M04 --> M03["M03 Chi tiết giao dịch"]
     store --> M05["M05 Danh mục SKU"] --> M06["M06 Chi tiết SKU"]
-    store --> M07["M07 Đợt nhập"] --> M08["M08 Chi tiết đợt nhập"] --> L01["L01 Gán nhãn có trợ lý"]
+    store --> M07["M07 Đợt nhập"] --> M08["M08 Chi tiết đợt nhập"]
+    M08 --> L01["L01 Ảnh mẫu & ảnh ghép"]
+    M08 --> L02["L02 Gán nhãn ảnh thật"]
 
-    model --> L03["L03 Phiên bản model"] --> L04["L04 Chi tiết phiên bản & Cổng duyệt"]
-    model --> L02["L02 Job"]
-    model --> L05["L05 Ngưỡng nhận diện"]
-    model --> L06["L06 Giám sát model"]
+    model --> L04["L04 Phiên bản model"] --> L05["L05 Chi tiết phiên bản & Cổng duyệt"]
+    model --> L03["L03 Job"]
+    model --> L06["L06 Ngưỡng nhận diện"]
+    model --> L07["L07 Giám sát model"]
 
     adm --> A01["A01 Người dùng"]
     adm --> A02["A02 Quầy & Camera"]
@@ -52,7 +54,7 @@ Mã màn hình: **S** chung · **P** quầy (POS) · **M** quản lý cửa hàn
 |---|---|---|
 | Thu ngân | P01 Mở ca (P02 nếu đã có ca) | Không có sidebar. Thanh trên màn quầy có: Lịch sử ca, Đăng xuất |
 | Quản lý | M01 Dashboard | **Cửa hàng:** Dashboard · Cảnh báo · Giao dịch · Danh mục SKU · Đợt nhập — **Model (xem):** Phiên bản · Giám sát — nút **Mở màn quầy** |
-| Kỹ sư ML | L03 Phiên bản model | **Model:** Phiên bản · Job · Ngưỡng · Giám sát — **Dữ liệu:** Đợt nhập · Danh mục SKU · Dashboard |
+| Kỹ sư ML | L04 Phiên bản model | **Model:** Phiên bản · Job · Ngưỡng · Giám sát — **Dữ liệu:** Đợt nhập · Danh mục SKU · Dashboard |
 | Quản trị viên | A01 Người dùng | Người dùng · Quầy & Camera · Nhật ký · Cài đặt lưu trữ |
 
 Vào URL không có quyền → màn **Không có quyền**.
@@ -63,7 +65,7 @@ Vào URL không có quyền → màn **Không có quyền**.
 |---|---|---|
 | Thanh trạng thái quầy | P01–P06 | Quầy · trạng thái camera · phiên bản model · thu ngân · giờ · Lịch sử ca · Đăng xuất |
 | Sidebar + thanh trên | M, L, A, S02 | Menu theo vai trò · tên trang · model đang chạy · tài khoản |
-| Ô xem ảnh khay | P02, P03, M03, L01 | Ảnh + box có nhãn chữ; bấm box để chọn; làm nổi box liên quan |
+| Ô xem ảnh khay | P02, P03, M03, L02 | Ảnh + box có nhãn chữ; bấm box để chọn; làm nổi box liên quan |
 | Trạng thái trang | Mọi danh sách | Đang tải · Rỗng (kèm gợi ý) · Lỗi (kèm Thử lại) |
 
 ## 4. Màn hình chung
@@ -163,7 +165,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 | Ảnh khay | Box nhận diện và box gây cảnh báo | 👁 | 👁 |
 | Cảnh báo | Cách xử lý, người xác nhận, lý do; **Hậu kiểm**: Cảnh báo đúng / Báo nhầm thật / Nghi gian lận | ✏️ | 👁 |
 | Đối chiếu theo SKU | Đã quét · Camera thấy · Chênh | 👁 | 👁 |
-| Gửi ảnh cho model | Đưa ảnh vào hàng đợi dữ liệu | ✏️ | ✏️ |
+| Gửi vào hàng đợi ảnh khó | Ảnh khay vào hàng đợi gán nhãn của đợt tới (L02) | ✏️ | ✏️ |
 
 ### M04 — Giao dịch · `/transactions`
 | Section | Nội dung | QL |
@@ -182,7 +184,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 |---|---|:-:|:-:|
 | Thông tin | Nhóm, giá (sửa được), trạng thái bán | ✏️ | 👁 |
 | Nhận diện | Trạng thái học, đợt, SKU hay bị nhầm với | 👁 | 👁 |
-| Ảnh mẫu | Ảnh sản phẩm | 👁 | 👁 |
+| Ảnh mẫu | Ảnh cắt nền đã nhận của SKU | 👁 | 👁 |
 
 ### M07 — Đợt nhập · `/batches`
 | Section | Nội dung | QL | ML |
@@ -193,39 +195,51 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 ### M08 — Chi tiết đợt nhập · `/batches/:id`
 | Section | Nội dung | QL | ML |
 |---|---|:-:|:-:|
-| Tiến trình | Tạo đợt → Gán nhãn → Huấn luyện → Chờ duyệt → Đã deploy | 👁 | 👁 |
-| Dữ liệu theo SKU | Box đã duyệt / mục tiêu; số ảnh val | 👁 | 👁 |
-| Gán nhãn | Tiến độ hàng đợi; **Bắt đầu gán nhãn** → L01 | — | ✏️ |
-| Gửi huấn luyện | Bật khi đủ dữ liệu | — | ✏️ |
-| Job & phiên bản | Job của đợt, phiên bản sinh ra → L04 | 👁 | 👁 |
+| Tiến trình | Tạo đợt → Thu thập dữ liệu → Huấn luyện → Chờ duyệt → Đã deploy | 👁 | 👁 |
+| Thẻ chỉ số | SKU đủ ảnh mẫu · số ảnh ghép · số ảnh tập kiểm tra | 👁 | 👁 |
+| Dữ liệu theo SKU | Ảnh mẫu đã nhận / mục tiêu · box trong tập kiểm tra / mục tiêu | 👁 | 👁 |
+| 1. Ảnh mẫu → ảnh ghép | Điều kiện đã đạt; **Mở ảnh mẫu** → L01 | ✏️ | ✏️ |
+| 2. Ảnh thật → tập kiểm tra | Tiến độ hàng đợi; **Gán nhãn ảnh thật** → L02 | 👁 | ✏️ |
+| Gửi huấn luyện | Bật khi đạt BR-11; tùy chọn trộn ảnh thật vượt mức (BR-16) | — | ✏️ |
+| Job & phiên bản | Job của đợt, phiên bản sinh ra → L05 | 👁 | 👁 |
 
 ## 7. Khu vực Quản trị — Model
 
-### L01 — Gán nhãn có trợ lý · `/batches/:id/label`
-Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box.
+### L01 — Ảnh mẫu & ảnh ghép · `/batches/:id/samples`
+Bố cục 3 cột: danh sách SKU mới · ảnh cắt của SKU đang chọn · ảnh ghép.
+
+| Section | Nội dung | QL | ML |
+|---|---|:-:|:-:|
+| Thanh trên | Số SKU đủ ảnh mẫu | 👁 | 👁 |
+| SKU mới | Mỗi SKU: ảnh đã nhận / mục tiêu; chọn để xem | ✏️ | ✏️ |
+| Ảnh cắt | Hướng dẫn chụp; **Tải ảnh mẫu**; lưới ảnh đã cắt nền: Chờ duyệt / Cần xem kỹ / Nhận / Loại; **Nhận ảnh rõ** | ✏️ tải | ✏️ |
+| Ảnh ghép | **Tạo ảnh ghép** (bật khi mọi SKU đủ ảnh); số ảnh đã tạo; ví dụ ảnh ghép; ghi chú ảnh ghép chỉ để huấn luyện | 👁 | ✏️ |
+
+### L02 — Gán nhãn ảnh thật · `/batches/:id/label`
+Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lưu xong vào tập kiểm tra của đợt.
 
 | Section | Nội dung | ML |
 |---|---|:-:|
-| Thanh trên | Ảnh x/y; Bỏ qua ảnh; **Lưu & ảnh tiếp** | ✏️ |
+| Thanh trên | Ảnh x/y; nguồn ảnh (giao dịch có hàng mới / ảnh khó); Bỏ qua ảnh; **Lưu & ảnh tiếp** | ✏️ |
 | Hàng mới cần vẽ | SKU mới trong khay theo mã vạch, số đã vẽ / cần vẽ; chọn để vẽ | ✏️ |
 | Ảnh | Đề xuất hàng cũ (nét đứt) · đã chấp nhận (nét liền) · vẽ tay (tím). Kéo chuột để vẽ | ✏️ |
-| Danh sách box | Chấp nhận / từ chối từng box; **Chấp nhận ≥ 0,7**; gắn "Cần xem kỹ" cho đề xuất độ tin thấp | ✏️ |
+| Danh sách box | Chấp nhận / từ chối từng box; **Chấp nhận ≥ 0,7**; "Cần xem kỹ" cho đề xuất độ tin thấp; "Thay bằng box vẽ" cho đề xuất nằm dưới box vẽ tay | ✏️ |
 | Phím tắt & thống kê | `1–9` chọn SKU · `A` chấp nhận · `Del` xóa · `Enter` lưu; % đề xuất được chấp nhận | 👁 |
 
-### L02 — Job · `/jobs`
+### L03 — Job · `/jobs`
 | Section | Nội dung | ML |
 |---|---|:-:|
 | Bảng job | Loại, đợt, trạng thái, tiến độ, giờ GPU, thời gian | 👁 |
 | Chi tiết | Log; Hủy / Chạy lại | ✏️ |
 
-### L03 — Phiên bản model · `/models`
+### L04 — Phiên bản model · `/models`
 | Section | Nội dung | ML | QL |
 |---|---|:-:|:-:|
 | Thẻ chỉ số | Phiên bản đang chạy, số SKU, AP50, cAcc | 👁 | 👁 |
 | Biểu đồ | AP50 và cAcc qua các phiên bản, kèm giải thích | 👁 | 👁 |
-| Dòng thời gian + bảng | Mọi phiên bản, trạng thái, kết quả cổng duyệt → L04 | 👁 | 👁 |
+| Dòng thời gian + bảng | Mọi phiên bản, trạng thái, kết quả cổng duyệt → L05 | 👁 | 👁 |
 
-### L04 — Chi tiết phiên bản & Cổng duyệt · `/models/:id`
+### L05 — Chi tiết phiên bản & Cổng duyệt · `/models/:id`
 | Section | Nội dung | ML | QL |
 |---|---|:-:|:-:|
 | Cổng duyệt | Từng điều kiện: giá trị mới · bản đang chạy · Đạt / Không đạt | 👁 | 👁 |
@@ -233,14 +247,14 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box.
 | Cặp hay nhầm | Top cặp SKU nhầm trên val | 👁 | 👁 |
 | Hành động | **Deploy** (xác nhận; ghi lý do nếu không đạt) · **Từ chối** · **Rollback** | ✏️ | — |
 
-### L05 — Ngưỡng nhận diện · `/thresholds`
+### L06 — Ngưỡng nhận diện · `/thresholds`
 | Section | Nội dung | ML |
 |---|---|:-:|
 | Chỉnh ngưỡng | Theo nhóm đợt: ngưỡng cảnh báo, tự nhận, thấp | ✏️ |
 | Xem trước | Bắt món sót · báo nhầm · % tự nhận, tính lại ngay | 👁 |
 | Lịch sử | Các lần đổi; Hoàn tác | ✏️ |
 
-### L06 — Giám sát model · `/monitoring`
+### L07 — Giám sát model · `/monitoring`
 | Section | Nội dung | ML | QL |
 |---|---|:-:|:-:|
 | Thẻ chỉ số | Độ trễ, khay có cảnh báo, báo nhầm, % tự nhận | 👁 | 👁 |
@@ -266,8 +280,9 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box.
 | M04 Giao dịch | — | 👁 | — | — |
 | M05, M06 SKU | — | ✏️ | 👁 | — |
 | M07, M08 Đợt nhập | — | ✏️ | ✏️ | — |
-| L01 Gán nhãn, L02 Job, L05 Ngưỡng | — | — | ✏️ | — |
-| L03, L04 Phiên bản, L06 Giám sát | — | 👁 | ✏️ | — |
+| L01 Ảnh mẫu | — | ✏️ (tải ảnh) | ✏️ | — |
+| L02 Gán nhãn, L03 Job, L06 Ngưỡng | — | — | ✏️ | — |
+| L04, L05 Phiên bản, L07 Giám sát | — | 👁 | ✏️ | — |
 | A01, A02, A04 | — | — | — | ✏️ |
 | A03 Nhật ký | — | 👁 | — | 👁 |
 
@@ -275,11 +290,11 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box.
 
 | Story | Màn hình | Story | Màn hình |
 |---|---|---|---|
-| US01–US03 | S01, S02 | US15 | M05, M06 |
-| US04, US12 | P01, P06 | US16, US18 | M07, M08 |
-| US05–US08 | P02, P04 | US17 | L01 |
-| US09, US10 | P03 | US19 | L02 |
-| US11 | P05 | US20, US21 | L03, L04 |
-| US13 | M01 | US22 | L05 |
-| US14 | M02, M03 | US23 | L06 |
-| | | US24–US27 | A01–A04 |
+| US01–US03 | S01, S02 | US16, US19 | M07, M08 |
+| US04, US12 | P01, P06 | US17 | L01 |
+| US05–US08 | P02, P04 | US18 | L02 |
+| US09, US10 | P03 | US20 | L03 |
+| US11 | P05 | US21, US22 | L04, L05 |
+| US13 | M01 | US23 | L06 |
+| US14 | M02, M03 | US24 | L07 |
+| US15 | M05, M06 | US25–US28 | A01–A04 |

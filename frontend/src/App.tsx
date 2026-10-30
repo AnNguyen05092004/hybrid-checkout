@@ -21,6 +21,7 @@ import { SkuDetailPage } from "./features/store/SkuDetailPage";
 import { BatchesPage } from "./features/store/BatchesPage";
 import { BatchDetailPage } from "./features/store/BatchDetailPage";
 import { LabelingPage } from "./features/ml/LabelingPage";
+import { SamplesPage } from "./features/ml/SamplesPage";
 import { JobsPage } from "./features/ml/JobsPage";
 import { ModelsPage } from "./features/ml/ModelsPage";
 import { ModelDetailPage } from "./features/ml/ModelDetailPage";
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="/skus/:id" element={<Allow roles={MML}><SkuDetailPage /></Allow>} />
             <Route path="/batches" element={<Allow roles={MML}><BatchesPage /></Allow>} />
             <Route path="/batches/:id" element={<Allow roles={MML}><BatchDetailPage /></Allow>} />
+            <Route path="/batches/:id/samples" element={<Allow roles={MML}><SamplesPage /></Allow>} />
             <Route path="/batches/:id/label" element={<Allow roles={ML}><LabelingPage /></Allow>} />
             <Route path="/jobs" element={<Allow roles={ML}><JobsPage /></Allow>} />
             <Route path="/models" element={<Allow roles={MML}><ModelsPage /></Allow>} />

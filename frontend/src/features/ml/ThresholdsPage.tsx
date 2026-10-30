@@ -4,7 +4,7 @@ import { Card, DemoNote, PageHeader, Stat } from "../../components/ui";
 import { pct } from "../../lib/format";
 import { simulate } from "./simulate";
 
-/** L05 — Detection thresholds per batch group with live preview (US22, BR-10). */
+/** L06 — Detection thresholds per batch group with live preview (US23, BR-10). */
 export function ThresholdsPage() {
   const { thresholds, setThresholds, activeBatch, audit } = useStore();
   const [draft, setDraft] = useState<Record<number, Thresholds>>(thresholds);

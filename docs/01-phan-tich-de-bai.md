@@ -26,8 +26,9 @@ MỤC TIÊU: giảm thất thoát tại quầy, giữ tốc độ phục vụ
 │   ├── Cửa hàng nhập SKU mới theo đợt; model chưa học thì không kiểm tra được
 │   └── Train lại từ đầu mỗi đợt tốn GPU và phải giữ mãi ảnh cũ
 │
-└── P4. Gán nhãn mỗi đợt tốn công
-    └── Ảnh khay có cả hàng cũ lẫn hàng mới; vẽ tay toàn bộ box rất lâu
+└── P4. Dữ liệu cho mỗi đợt tốn công
+    ├── Vẽ tay box trên ảnh khay (có cả hàng cũ lẫn hàng mới) rất lâu
+    └── Ảnh ghép thì rẻ nhưng khác ảnh camera thật, không dùng để duyệt model được
 ```
 
 P1, P2 xảy ra **tại quầy**. P3, P4 là việc **hậu trường**, quyết định camera ở quầy có theo kịp hàng mới không.
@@ -66,7 +67,7 @@ Model nhận diện **từng món** rất tốt nhưng đúng **cả khay** thì
 |---|---|---|---|
 | 1 | **Kiểm tra chéo** | Thu ngân quét mã như thường. Trước khi thanh toán, camera chụp khay, hệ thống so với danh sách đã quét và báo *món chưa quét* hoặc *nghi tráo mã* | P1 |
 | 2 | **Làn nhanh** | Khách đặt cả khay. Camera tự thêm món chắc chắn; thu ngân chỉ quét món không chắc và hàng mới | P2 |
-| 3 | **Trợ lý gán nhãn** | Khi nhập hàng mới, model tự đề xuất box cho hàng cũ; người chỉ vẽ box hàng mới. Dữ liệu này dùng để huấn luyện và duyệt phiên bản model mới | P3, P4 |
+| 3 | **Trợ lý gán nhãn** | Khi nhập hàng mới: (a) chụp từng sản phẩm, AI cắt nền, hệ thống ghép thành ảnh khay có sẵn box để **huấn luyện**; (b) trên ảnh khay thật từ quầy, model đề xuất box hàng cũ, người chỉ vẽ hàng mới để tạo tập **kiểm tra** cho cổng duyệt | P3, P4 |
 
 ```
  TẠI QUẦY                                  HẬU TRƯỜNG
@@ -82,6 +83,8 @@ Mã vạch còn giúp camera: khi khay có **hàng mới model chưa học**, m�
 ## 5. Model nhận diện
 
 Hệ thống dùng model nhận diện đang được nghiên cứu: phát hiện và đếm SKU trên ảnh khay chụp từ trên xuống. Model **học thêm SKU mới theo đợt** mà không train lại từ đầu và không cần giữ ảnh của các đợt cũ.
+
+Model học từ **ảnh ghép** (ảnh chụp từng sản phẩm, cắt nền, dán lên nền khay); các chỉ số dưới đây đo trên **ảnh khay thật**. Vì vậy hệ thống cũng lấy ảnh ghép để huấn luyện và ảnh thật để duyệt model.
 
 | Chỉ số (bản mới nhất, 200 SKU) | Giá trị | Hệ quả cho thiết kế |
 |---|---|---|
@@ -110,7 +113,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 
 ## 7. Phạm vi
 
-**Làm:** quầy thu ngân với Kiểm tra chéo và Làn nhanh · xử lý cảnh báo, xác nhận của quản lý · danh mục SKU · đợt nhập và Trợ lý gán nhãn · job huấn luyện, phiên bản model, cổng duyệt, deploy/rollback · dashboard, hậu kiểm, giám sát model · người dùng, quầy/camera, nhật ký, chính sách lưu ảnh.
+**Làm:** quầy thu ngân với Kiểm tra chéo và Làn nhanh · xử lý cảnh báo, xác nhận của quản lý · danh mục SKU · đợt nhập, ảnh mẫu → ảnh ghép, Trợ lý gán nhãn ảnh thật · job huấn luyện, phiên bản model, cổng duyệt, deploy/rollback · dashboard, hậu kiểm, giám sát model · người dùng, quầy/camera, nhật ký, chính sách lưu ảnh.
 
 **Không làm:** quầy tự thanh toán · thanh toán và in hóa đơn thật · kết nối POS/ERP có sẵn · hàng không mã vạch (rau, bánh mì) · theo dõi khách/nhân viên (camera chỉ chụp khay) · huấn luyện thật trong bản demo.
 
@@ -120,7 +123,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 |---|---|
 | Thu ngân | Quét nhanh; biết ngay món nào cần quét lại; không bị cảnh báo vô lý |
 | Quản lý cửa hàng | Xác nhận cảnh báo tại quầy; xem thất thoát; quản lý danh mục, giá, đợt nhập |
-| Kỹ sư ML | Gán nhãn nhanh; huấn luyện, so sánh, deploy model an toàn |
+| Kỹ sư ML | Chuẩn bị dữ liệu nhanh (ảnh mẫu, ảnh thật); huấn luyện, so sánh, deploy model an toàn |
 | Quản trị viên | Tài khoản, quầy/camera, nhật ký, chính sách dữ liệu |
 
 ## 9. Giả định và ràng buộc
@@ -143,6 +146,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | SKU giống nhau bị nhầm, báo tráo mã sai | Hiện ảnh vùng nghi ngờ; hạ mức cảnh báo cho cặp hay nhầm |
 | Thu ngân tự tắt cảnh báo của mình | Cảnh báo nghiêm trọng chỉ đóng bằng quét bổ sung hoặc PIN quản lý |
 | Deploy model kém hơn | Cổng duyệt và rollback một bước |
+| Model tốt trên ảnh ghép nhưng kém ở quầy | Cổng duyệt chỉ đo trên ảnh thật; ảnh khó từ quầy đưa vào hàng đợi gán nhãn đợt sau |
 
 ## 11. Quyết định đã chốt
 
@@ -156,6 +160,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | D06 | Camera chỉ kiểm tra SKU mà model đang chạy đã học |
 | D07 | Model chạy thành dịch vụ riêng, hệ thống không sửa code model |
 | D08 | Tài liệu tiếng Việt; prototype giao diện bằng React, dữ liệu giả lập |
+| D09 | Ảnh ghép là dữ liệu huấn luyện chính; ảnh thật làm tập kiểm tra. Trộn ảnh thật vào huấn luyện chỉ bật khi thí nghiệm cho thấy có lợi |
 
 ## 12. Thuật ngữ
 
@@ -169,6 +174,9 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | AP50 | Độ chính xác nhận diện từng món |
 | cAcc | Tỉ lệ khay được đếm đúng toàn bộ |
 | Cổng duyệt | Điều kiện phiên bản model mới phải đạt trước khi deploy |
+| Ảnh mẫu | Ảnh chụp riêng từng sản phẩm, đã cắt nền |
+| Ảnh ghép | Ảnh khay tạo bằng cách dán ảnh mẫu lên nền khay; box có sẵn |
+| Tập kiểm tra (val) | Ảnh khay thật đã gán nhãn đủ, dùng để duyệt model |
 
 ## Nguồn
 

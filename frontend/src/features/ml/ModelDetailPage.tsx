@@ -7,7 +7,7 @@ import { dateTime, pct } from "../../lib/format";
 import { CONFUSED_PAIRS, GATE, MODEL_VERSIONS } from "../../mocks/models";
 import { sku } from "../../mocks/catalog";
 
-/** L04 — Version detail and deployment gate (US20, US21, BR-08, BR-09). */
+/** L05 — Version detail and deployment gate (US21, US22, BR-08, BR-09). */
 export function ModelDetailPage() {
   const { id } = useParams();
   const { versionStatus, versionCreatedAt, activeBatch, deploy, rollback, reject, user, jobs } = useStore();

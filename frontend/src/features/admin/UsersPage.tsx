@@ -5,7 +5,7 @@ import { Badge, Card, Modal, PageHeader, Stat } from "../../components/ui";
 import { dateTime } from "../../lib/format";
 import { ROLE_LABEL, type Role, type User } from "../../mocks/seed";
 
-/** A01 — Users (US24). */
+/** A01 — Users (US25). */
 export function UsersPage() {
   const { users, setUsers, user: me, log, toast } = useStore();
   const [editing, setEditing] = useState<User | null>(null);

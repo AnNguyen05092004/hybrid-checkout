@@ -107,13 +107,13 @@ export const VersionBadge = ({ status }: { status: VersionStatus }) => <Badge to
 
 export const BATCH_STEPS: { status: BatchStatus; label: string }[] = [
   { status: "NHAP", label: "Tạo đợt" },
-  { status: "DANG_GAN_NHAN", label: "Gán nhãn" },
+  { status: "THU_THAP", label: "Thu thập dữ liệu" },
   { status: "DANG_HUAN_LUYEN", label: "Huấn luyện" },
   { status: "CHO_DUYET", label: "Chờ duyệt" },
   { status: "DA_DEPLOY", label: "Đã deploy" },
 ];
 const BATCH: Record<BatchStatus, [string, string]> = {
-  NHAP: ["", "Nháp"], DANG_GAN_NHAN: ["info", "Đang gán nhãn"], CHO_HUAN_LUYEN: ["info", "Chờ huấn luyện"],
+  NHAP: ["", "Nháp"], THU_THAP: ["info", "Thu thập dữ liệu"],
   DANG_HUAN_LUYEN: ["warn", "Đang huấn luyện"], CHO_DUYET: ["primary", "Chờ duyệt"], DA_DEPLOY: ["ok", "Đã deploy"],
 };
 export const BatchBadge = ({ status }: { status: BatchStatus }) => <Badge tone={BATCH[status][0]}>{BATCH[status][1]}</Badge>;
