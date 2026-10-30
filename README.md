@@ -300,8 +300,12 @@ npm run lint
 2. **Kiểm tra chéo:** trong khung "Mô phỏng thiết bị" (thay cho khay thật và máy quét), bấm **Quét** cho mọi món trừ một món → **Kiểm tra khay** → cảnh báo đỏ "Món chưa quét", nút Thanh toán bị khóa → bấm **Quét** món còn thiếu → cảnh báo tự đóng → **Thanh toán**.
 3. **Báo nhầm và PIN:** ở giao dịch mới, bấm **Tráo** ở một món (quét mã một món rẻ hơn cùng nhóm), quét các món còn lại → **Kiểm tra khay** → cảnh báo "Nghi tráo mã". Giả sử camera sai: **Camera báo nhầm** → chọn lý do → thanh toán được ngay. Bấm thùng rác ở một dòng giỏ hàng để xem hộp thoại PIN quản lý.
 4. **Làn nhanh:** chọn tab **Làn nhanh** → chọn khay có ghi "có hàng mới" → **Nhận diện khay**. Món khung xanh tự vào giỏ. Món **khung cam có số thứ tự** là món camera chưa chắc chắn (thường là hàng mới model chưa học): quét từng món này → tích "đã quét hết món ngoài vùng" → **Thanh toán**.
-5. **Kỹ sư ML** → Đợt nhập → **Đợt 5** → **Mở ảnh mẫu**: 5 SKU còn thiếu ảnh (nhãn cam), chọn từng SKU và bấm **Nhận ảnh rõ** (SKU nào vẫn chưa đủ 8 ảnh thì bấm ✓ ở ảnh "Cần xem kỹ") → **Tạo ảnh ghép**. Về Đợt 5 → **Gán nhãn ảnh thật**: hàng đợi demo có **4 ảnh khay thật** chứa hàng mới. Với mỗi ảnh: **Điền box mẫu** (thay cho việc tự vẽ box hàng mới) → **Chấp nhận ≥ 0,7** → chấp nhận nốt các đề xuất "Cần xem kỹ" → **Lưu & ảnh tiếp**. Lưu đủ 4 ảnh thì tập kiểm tra đạt 52/50 ảnh và nút Gửi huấn luyện sáng lên.
-6. **Gửi huấn luyện** → đợi job khoảng 10 giây → **Phiên bản model** → **v5** → xem cổng duyệt → **Deploy**.
+5. **Kỹ sư ML** → Đợt nhập → **Đợt 5** (lô hàng mới mà camera chưa nhận diện được). Cần chuẩn bị hai loại dữ liệu:
+   - **Ảnh ghép, để huấn luyện:** **Mở ảnh mẫu** → với các SKU còn thiếu ảnh, nhận những ảnh sản phẩm đã cắt nền sạch → **Tạo ảnh ghép**. Box có sẵn khi ghép nên không phải vẽ.
+   - **Ảnh thật, để kiểm tra model:** quay về đợt → **Gán nhãn ảnh thật** → với mỗi ảnh, duyệt khung hàng cũ do model đề xuất và vẽ khung cho hàng mới (bản demo có nút **Điền box mẫu**) → **Lưu & ảnh tiếp** đến hết hàng đợi.
+
+   Đủ cả hai loại dữ liệu thì nút **Gửi huấn luyện** sáng lên.
+6. **Gửi huấn luyện** → đợi job chạy xong → **Phiên bản model** → **v5** → xem cổng duyệt → **Deploy**.
 7. **Thu ngân** → **Làn nhanh** → chọn lại khay ở bước 4: hàng mới giờ được camera tự nhận, không phải quét nữa.
 8. **Quản lý** → **Cảnh báo & Hậu kiểm**: mục "Cần hậu kiểm trước" liệt kê báo nhầm đáng ngờ kèm lý do; bảng theo thu ngân gắn cờ "Bất thường" cho một người.
 
