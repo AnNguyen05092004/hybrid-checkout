@@ -21,7 +21,7 @@ export function MonitoringPage() {
     const serious = txs.flatMap((t) => t.alerts.filter((a) => a.severity !== "LOW"));
     return {
       alertRate: txs.length ? (txs.filter((t) => t.alerts.some((a) => a.severity !== "LOW")).length / txs.length) * 100 : 0,
-      falseRate: serious.length ? (serious.filter((a) => a.resolution === "BAO_NHAM").length / serious.length) * 100 : 0,
+      falseRate: serious.length ? (serious.filter((a) => a.resolution === "FALSE_ALARM").length / serious.length) * 100 : 0,
       latency: 1.1 + hash01(key) * 0.6,
       corrections: txs.reduce((s, t) => s + t.corrections, 0),
     };
@@ -29,7 +29,7 @@ export function MonitoringPage() {
   const last = per[per.length - 1];
   // False alarms from the counters, grouped by what the model saw: recurring ones point at the model, not the cashier.
   const byPair = new Map<string, { seen: number; scanned?: number; count: number }>();
-  transactions.flatMap((t) => t.alerts).filter((a) => a.resolution === "BAO_NHAM" && a.seenSku).forEach((a) => {
+  transactions.flatMap((t) => t.alerts).filter((a) => a.resolution === "FALSE_ALARM" && a.seenSku).forEach((a) => {
     const key = `${a.seenSku}-${a.scannedSku ?? ""}`;
     const row = byPair.get(key) ?? { seen: a.seenSku!, scanned: a.scannedSku, count: 0 };
     byPair.set(key, { ...row, count: row.count + 1 });
@@ -53,7 +53,7 @@ export function MonitoringPage() {
         <Card title="Tỉ lệ cảnh báo và báo nhầm theo ngày">
           <Lines labels={days.map((d) => d.label)} min={0} max={100} series={[
             { name: "Khay có cảnh báo", color: "#dc2626", values: per.map((p) => p.alertRate) },
-            { name: "Báo nhầm", color: "#64748b", values: per.map((p) => p.falseRate) },
+            { name: "Báo nhầm", color: "#55554f", values: per.map((p) => p.falseRate) },
           ]} />
         </Card>
         <Card title="Cặp SKU hay nhầm" bodyClass="">

@@ -40,9 +40,9 @@ export function AlertList({ co, focus, onFocus, onScanMore, onFalseAlarm }: {
               {a.value > 0 && <span className="strong">{money(a.value)}</span>}
             </div>
             <div className="small">
-              {a.type === "MON_CHUA_QUET" && <>Camera thấy <b>{a.qty} × {sku(a.seenSku!).name}</b> nhưng chưa quét.</>}
-              {a.type === "NGHI_TRAO_MA" && <>Đã quét <b>{sku(a.scannedSku!).name}</b> ({money(sku(a.scannedSku!).price)}) nhưng camera thấy <b>{sku(a.seenSku!).name}</b> ({money(sku(a.seenSku!).price)}).</>}
-              {a.type === "QUET_KHONG_THAY" && <>Đã quét {a.qty} × {sku(a.scannedSku!).name} nhưng camera không thấy (có thể đã cho vào túi).</>}
+              {a.type === "UNSCANNED_ITEM" && <>Camera thấy <b>{a.qty} × {sku(a.seenSku!).name}</b> nhưng chưa quét.</>}
+              {a.type === "SUSPECTED_SWAP" && <>Đã quét <b>{sku(a.scannedSku!).name}</b> ({money(sku(a.scannedSku!).price)}) nhưng camera thấy <b>{sku(a.seenSku!).name}</b> ({money(sku(a.seenSku!).price)}).</>}
+              {a.type === "SCANNED_NOT_SEEN" && <>Đã quét {a.qty} × {sku(a.scannedSku!).name} nhưng camera không thấy (có thể đã cho vào túi).</>}
             </div>
             <div className="row" onClick={(e) => e.stopPropagation()}>
               {a.severity !== "LOW" ? (

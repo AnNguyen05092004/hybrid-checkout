@@ -1,6 +1,10 @@
 # Dependencies and build output
 node_modules/
 dist/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 .vite/
 *.tsbuildinfo
 
@@ -12,3 +16,6 @@ frontend/public/samples/
 .env.local
 .DS_Store
 *.log
+
+# Personal notes, not part of the project
+AN/

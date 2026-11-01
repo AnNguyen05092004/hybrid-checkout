@@ -9,7 +9,7 @@ import { GATE, MODEL_VERSIONS } from "../../mocks/models";
 export function ModelsPage() {
   const { versionStatus, versionCreatedAt, activeBatch } = useStore();
   const navigate = useNavigate();
-  const shown = MODEL_VERSIONS.filter((v) => versionStatus[v.id] !== "CHUA_CO");
+  const shown = MODEL_VERSIONS.filter((v) => versionStatus[v.id] !== "NOT_TRAINED");
   const active = MODEL_VERSIONS.find((v) => v.batch === activeBatch)!;
   const prev = (i: number) => MODEL_VERSIONS[i - 1];
 
@@ -26,7 +26,7 @@ export function ModelsPage() {
       <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", alignItems: "start" }}>
         <Card title="Chỉ số qua các phiên bản (tập val)">
           <Lines labels={shown.map((v) => v.id)} min={40} max={100} series={[
-            { name: "AP50", color: "#0d6e6e", values: shown.map((v) => v.ap50) },
+            { name: "AP50", color: "#0b0b0b", values: shown.map((v) => v.ap50) },
             { name: "cAcc", color: "#f59e0b", values: shown.map((v) => v.cacc) },
           ]} />
           <p className="small muted" style={{ marginTop: 8 }}>AP50 giữ ổn định khi thêm SKU (model không quên SKU cũ). cAcc giảm vì khay chứa nhiều SKU hơn và mỗi khay có nhiều món: đúng từng món tốt chưa đủ để đúng cả khay, nên mã vạch vẫn là kênh tính tiền.</p>

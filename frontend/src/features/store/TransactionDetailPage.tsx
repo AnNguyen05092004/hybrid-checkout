@@ -52,9 +52,9 @@ export function TransactionDetailPage() {
                 {tx.alerts.map((a) => (
                   <div key={a.id} className={`alert-card ${a.severity.toLowerCase()} ${focus === a.id ? "on" : ""}`} onClick={() => setFocus(focus === a.id ? null : a.id)}>
                     <div className="row"><span className="strong">{ALERT_LABEL[a.type]}</span><Badge tone={SEVERITY_TONE[a.severity]}>{SEVERITY_LABEL[a.severity]}</Badge><span className="spacer" />{a.value ? money(a.value) : ""}</div>
-                    <div className="small">{sku((a.seenSku ?? a.scannedSku)!).name} × {a.qty} — {RESOLUTION_LABEL[a.resolution]}{a.resolution === "BAO_NHAM" ? ` (${tx.cashier})` : ""}</div>
+                    <div className="small">{sku((a.seenSku ?? a.scannedSku)!).name} × {a.qty} — {RESOLUTION_LABEL[a.resolution]}{a.resolution === "FALSE_ALARM" ? ` (${tx.cashier})` : ""}</div>
                     {a.reason && <div className="small muted">Lý do: {a.reason}</div>}
-                    {a.resolution === "BAO_NHAM" && (
+                    {a.resolution === "FALSE_ALARM" && (
                       <div className="row wrap" onClick={(e) => e.stopPropagation()}>
                         <span className="small muted">Hậu kiểm:</span>
                         {(Object.keys(REVIEW_LABEL) as Review[]).map((r) => (
@@ -80,6 +80,16 @@ export function TransactionDetailPage() {
               })}</tbody>
             </table></div>
           </Card>
+          {tx.removed.length > 0 && (
+            <Card title="Dòng đã xóa" bodyClass="">
+              <div className="table-wrap"><table className="table">
+                <thead><tr><th>SKU</th><th className="num">SL</th><th className="num">Thành tiền</th><th>Lý do</th></tr></thead>
+                <tbody>{tx.removed.map((l, i) => (
+                  <tr key={i}><td>{sku(l.skuId).name}</td><td className="num">{l.qty}</td><td className="num">{money(l.qty * l.price)}</td><td>{l.reason} ({tx.cashier})</td></tr>
+                ))}</tbody>
+              </table></div>
+            </Card>
+          )}
           {(canReview || user?.role === "ML_ENGINEER") && <button className="btn" onClick={() => toast("Đã thêm ảnh khay vào hàng đợi ảnh khó. Kỹ sư ML gán nhãn ở đợt nhập tới.")}>Gửi vào hàng đợi ảnh khó</button>}
         </div>
       </div>

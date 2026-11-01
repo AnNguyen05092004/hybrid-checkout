@@ -21,19 +21,19 @@ export function DashboardPage() {
   const since = new Date();
   since.setHours(0, 0, 0, 0);
   since.setDate(since.getDate() - (days - 1));
-  const txs = transactions.filter((t) => t.status === "DA_THANH_TOAN" && new Date(t.at) >= since && (counter === "ALL" || t.counterId === counter));
+  const txs = transactions.filter((t) => t.status === "PAID" && new Date(t.at) >= since && (counter === "ALL" || t.counterId === counter));
   const alerts = txs.flatMap((t) => t.alerts.map((a) => ({ ...a, tx: t })));
-  const caught = alerts.filter((a) => a.resolution === "DA_QUET_BO_SUNG").reduce((s, a) => s + a.value, 0);
+  const caught = alerts.filter((a) => a.resolution === "SCANNED").reduce((s, a) => s + a.value, 0);
   const withAlert = txs.filter((t) => t.alerts.some((a) => a.severity !== "LOW")).length;
   const serious = alerts.filter((a) => a.severity !== "LOW")
-    .map((a) => ({ ...a, id: `${a.tx.id}-${a.id}`, cashier: a.tx.cashier, falseAlarm: a.resolution === "BAO_NHAM" }));
+    .map((a) => ({ ...a, id: `${a.tx.id}-${a.id}`, cashier: a.tx.cashier, falseAlarm: a.resolution === "FALSE_ALARM" }));
   const falseConfirmed = serious.filter((a) => a.falseAlarm);
   const selling = skus.filter((s) => s.selling);
   const covered = selling.filter((s) => isLearned(s.id)).length;
   // Post-review queue in priority order, same as M02 (UC14).
   const anomalous = new Set(cashierStats(serious).cashiers.filter((c) => c.anomalous).map((c) => c.cashier));
   const pending = byPriority(falseConfirmed.filter((a) => !a.review), anomalous).slice(0, 5);
-  const openBatch = batches.find((b) => b.status !== "DA_DEPLOY");
+  const openBatch = batches.find((b) => b.status !== "DEPLOYED");
   const model = MODEL_VERSIONS.find((m) => m.batch === activeBatch)!;
 
   const dayLabels: string[] = [];
@@ -67,9 +67,9 @@ export function DashboardPage() {
       <div className="grid" style={{ gridTemplateColumns: "2fr 1fr", alignItems: "start" }}>
         <Card title="Cảnh báo theo ngày (7 ngày gần nhất)">
           <StackedBars labels={dayLabels} series={[
-            { name: ALERT_LABEL.MON_CHUA_QUET, color: "#dc2626", values: perDay("MON_CHUA_QUET") },
-            { name: ALERT_LABEL.NGHI_TRAO_MA, color: "#f59e0b", values: perDay("NGHI_TRAO_MA") },
-            { name: ALERT_LABEL.QUET_KHONG_THAY, color: "#94a3b8", values: perDay("QUET_KHONG_THAY") },
+            { name: ALERT_LABEL.UNSCANNED_ITEM, color: "#dc2626", values: perDay("UNSCANNED_ITEM") },
+            { name: ALERT_LABEL.SUSPECTED_SWAP, color: "#f59e0b", values: perDay("SUSPECTED_SWAP") },
+            { name: ALERT_LABEL.SCANNED_NOT_SEEN, color: "#a3a39e", values: perDay("SCANNED_NOT_SEEN") },
           ]} />
         </Card>
         <div className="col" style={{ gap: 16 }}>

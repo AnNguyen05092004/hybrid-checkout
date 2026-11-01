@@ -30,9 +30,9 @@ export interface Counter {
   cameraOnline: boolean;
 }
 
-/** BAO_NHAM: the cashier closed the alert as a model error, with a reason (BR-04). */
-export type Resolution = "MO" | "DA_QUET_BO_SUNG" | "BAO_NHAM" | "TU_DONG";
-export type Review = "XAC_NHAN_DUNG" | "BAO_NHAM_THAT" | "NGHI_GIAN_LAN";
+/** FALSE_ALARM: the cashier closed the alert as a model error, with a reason (BR-04). */
+export type Resolution = "OPEN" | "SCANNED" | "FALSE_ALARM" | "AUTO_CLOSED";
+export type Review = "ALERT_CORRECT" | "MODEL_ERROR" | "SUSPECTED_FRAUD";
 
 export interface AlertRecord extends TrayAlert {
   resolution: Resolution;
@@ -47,6 +47,11 @@ export interface TxLine {
   source: "BARCODE" | "CAMERA";
 }
 
+/** A line the cashier deleted, without a PIN; kept for the post-review (BR-05, BR-17). */
+export interface RemovedLine extends TxLine {
+  reason: string;
+}
+
 export interface Transaction {
   id: string;
   at: string;
@@ -56,15 +61,16 @@ export interface Transaction {
   trayId: string;
   modelVersion: string;
   lines: TxLine[];
+  removed: RemovedLine[];
   alerts: AlertRecord[];
-  status: "DA_THANH_TOAN" | "DA_HUY";
+  status: "PAID" | "CANCELLED";
   payment: "CASH" | "CARD" | "TRANSFER";
   total: number;
   corrections: number;
 }
 
 export type BatchStatus =
-  | "NHAP" | "THU_THAP" | "DANG_HUAN_LUYEN" | "CHO_DUYET" | "DA_DEPLOY";
+  | "DRAFT" | "COLLECTING" | "TRAINING" | "PENDING_REVIEW" | "DEPLOYED";
 
 export interface Batch {
   id: number;
@@ -79,7 +85,7 @@ export interface Job {
   id: string;
   batch: number;
   type: "TRAIN" | "EVAL";
-  status: "CHO" | "DANG_CHAY" | "DANG_DANH_GIA" | "XONG" | "LOI";
+  status: "QUEUED" | "RUNNING" | "EVALUATING" | "SUCCEEDED" | "FAILED";
   epoch: number;
   epochs: number;
   gpuHours: number;
@@ -123,18 +129,18 @@ export const COUNTERS: Counter[] = [
 ];
 
 export const PAST_BATCHES: Batch[] = [
-  { id: 1, name: "Khai trương — 100 SKU", status: "DA_DEPLOY", createdAt: "2026-10-20T09:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-23T21:30:00+07:00" },
-  { id: 2, name: "Đợt nhập 2 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-22T10:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-24T10:00:00+07:00" },
-  { id: 3, name: "Đợt nhập 3 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-23T14:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-25T08:00:00+07:00" },
-  { id: 4, name: "Đợt nhập 4 — 25 SKU", status: "DA_DEPLOY", createdAt: "2026-10-24T15:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-26T12:00:00+07:00" },
-  { id: 5, name: "Đợt nhập 5 — 25 SKU", status: "THU_THAP", createdAt: "2026-10-28T09:00:00+07:00", createdBy: "Lê Quốc Bảo" },
+  { id: 1, name: "Khai trương — 100 SKU", status: "DEPLOYED", createdAt: "2026-10-20T09:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-23T21:30:00+07:00" },
+  { id: 2, name: "Đợt nhập 2 — 25 SKU", status: "DEPLOYED", createdAt: "2026-10-22T10:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-24T10:00:00+07:00" },
+  { id: 3, name: "Đợt nhập 3 — 25 SKU", status: "DEPLOYED", createdAt: "2026-10-23T14:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-25T08:00:00+07:00" },
+  { id: 4, name: "Đợt nhập 4 — 25 SKU", status: "DEPLOYED", createdAt: "2026-10-24T15:00:00+07:00", createdBy: "Lê Quốc Bảo", deployedAt: "2026-10-26T12:00:00+07:00" },
+  { id: 5, name: "Đợt nhập 5 — 25 SKU", status: "COLLECTING", createdAt: "2026-10-28T09:00:00+07:00", createdBy: "Lê Quốc Bảo" },
 ];
 
 export const PAST_JOBS: Job[] = MODEL_VERSIONS.slice(0, 4).map((v) => ({
   id: `JOB-${v.batch}0${v.batch}`,
   batch: v.batch,
   type: "TRAIN",
-  status: "XONG",
+  status: "SUCCEEDED",
   epoch: 16,
   epochs: 16,
   gpuHours: v.gpuHours,
@@ -179,28 +185,32 @@ function seedTransactions(): Transaction[] {
       alertThreshold: () => 0.5, lowThreshold: 0.3,
     });
     const alerts: AlertRecord[] = result.alerts.map((a, k) => {
-      if (a.severity === "LOW") return { ...a, resolution: "TU_DONG" };
+      if (a.severity === "LOW") return { ...a, resolution: "AUTO_CLOSED" };
       // The second cashier closes far more alerts as false alarms, so the post-review flags them.
       const falseAlarm = hash01(`${key}-fa-${k}`) < (i % 2 ? 0.4 : 0.08);
       return falseAlarm
-        ? { ...a, resolution: "BAO_NHAM", reason: "Model nhầm SKU", review: hash01(`${key}-rv`) < 0.3 ? "BAO_NHAM_THAT" : undefined }
-        : { ...a, resolution: "DA_QUET_BO_SUNG" };
+        ? { ...a, resolution: "FALSE_ALARM", reason: "Model nhầm SKU", review: hash01(`${key}-rv`) < 0.3 ? "MODEL_ERROR" : undefined }
+        : { ...a, resolution: "SCANNED" };
     });
     // Lines after fixing: missed items scanned in addition
     const final = new Map(scanned);
-    alerts.filter((a) => a.resolution === "DA_QUET_BO_SUNG" && a.seenSku).forEach((a) => {
+    alerts.filter((a) => a.resolution === "SCANNED" && a.seenSku).forEach((a) => {
       final.set(a.seenSku!, (final.get(a.seenSku!) ?? 0) + a.qty);
-      if (a.type === "NGHI_TRAO_MA" && a.scannedSku) final.set(a.scannedSku, final.get(a.scannedSku)! - a.qty);
+      if (a.type === "SUSPECTED_SWAP" && a.scannedSku) final.set(a.scannedSku, final.get(a.scannedSku)! - a.qty);
     });
     const lines: TxLine[] = [...final].filter(([, q]) => q > 0)
       .map(([id, qty]) => ({ skuId: id, qty, price: sku(id).price, source: "BARCODE" }));
     const at = new Date(now - Math.floor(hash01(`${key}-t`) * 7 * 24) * 3600_000 - i * 60_000);
     at.setHours(8 + Math.floor(hash01(`${key}-h`) * 13));
     if (at.getTime() > now) at.setDate(at.getDate() - 1); // opening hours of today may still be ahead
+    // The second cashier also deletes lines far more often, so the post-review flags them too.
+    const drop = SKUS[Math.floor(hash01(`${key}-rm-sku`) * 40)];
+    const removed: RemovedLine[] = i % 4 === 1 || i % 20 === 0
+      ? [{ skuId: drop.id, qty: 1, price: drop.price, source: "BARCODE", reason: "Khách không lấy nữa" }] : [];
     out.push({
       id: `GD${String(1000 + i)}`, at: at.toISOString(), counterId: i % 3 === 0 ? "Q2" : "Q1",
       cashier: cashiers[i % 2], mode: i % 4 === 0 ? "FAST" : "VERIFY", trayId: t.id, modelVersion: "v4",
-      lines, alerts, status: "DA_THANH_TOAN", payment: (["CASH", "CARD", "TRANSFER"] as const)[i % 3],
+      lines, removed, alerts, status: "PAID", payment: (["CASH", "CARD", "TRANSFER"] as const)[i % 3],
       total: lines.reduce((s, l) => s + l.qty * l.price, 0), corrections: i % 4 === 0 ? Math.floor(r * 3) : 0,
     });
   }

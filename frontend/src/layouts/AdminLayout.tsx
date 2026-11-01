@@ -1,12 +1,12 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  AlertTriangle, BarChart3, Boxes, Cpu, FileClock, Gauge, LayoutDashboard, LogOut, MonitorSmartphone,
-  PackagePlus, Receipt, ScanLine, Settings, SlidersHorizontal, Tags, UserCircle, Users,
+  AlertTriangle, BarChart3, Cpu, FileClock, Gauge, LayoutDashboard, LogOut, MonitorSmartphone,
+  PackagePlus, Receipt, ScanLine, Settings, SlidersHorizontal, Tags, Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useStore } from "../app/store";
 import { ROLE_LABEL, type Role } from "../mocks/seed";
-import { Badge } from "../components/ui";
+import { Brand } from "../components/ui";
 
 interface Item { to: string; label: string; icon: ReactNode }
 interface Group { title: string; items: Item[] }
@@ -49,18 +49,21 @@ export const NAV: Record<Exclude<Role, "CASHIER">, Group[]> = {
   ],
 };
 
+const initials = (name: string) => name.split(" ").slice(-2).map((w) => w[0]).join("");
+
 export function AdminLayout() {
   const { user, logout, activeBatch } = useStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   if (!user || user.role === "CASHIER") return null;
   const groups = NAV[user.role];
-  const current = groups.flatMap((g) => g.items).find((i) => pathname.startsWith(i.to));
+  const group = groups.find((g) => g.items.some((i) => pathname.startsWith(i.to)));
+  const current = group?.items.find((i) => pathname.startsWith(i.to));
 
   return (
     <div className="admin">
       <aside className="sidebar">
-        <div className="brand"><Boxes size={22} /> HybridCheckout</div>
+        <Brand />
         {groups.map((g) => (
           <div key={g.title}>
             <div className="group">{g.title}</div>
@@ -71,17 +74,17 @@ export function AdminLayout() {
         ))}
         <div className="spacer" />
         {user.role === "STORE_MANAGER" && (
-          <a href="#" onClick={(e) => { e.preventDefault(); navigate("/pos"); }}><ScanLine size={18} />Mở màn quầy</a>
+          <div className="foot"><a href="#" onClick={(e) => { e.preventDefault(); navigate("/pos"); }}><ScanLine size={18} />Mở màn quầy</a></div>
         )}
       </aside>
       <div>
         <header className="topbar">
-          <span className="muted">{current?.label ?? "Hồ sơ"}</span>
+          <span className="crumb">{group?.title ?? "Tài khoản"}<span>/</span><b>{current?.label ?? "Hồ sơ"}</b></span>
           <div className="spacer" />
-          <Badge tone="ok">Model đang chạy: v{activeBatch}</Badge>
-          <NavLink to="/profile" className="row" style={{ color: "var(--text)" }}>
-            <UserCircle size={22} />
-            <span className="col" style={{ gap: 0 }}>
+          <span className="live" title="Phiên bản model đang chạy ở quầy"><i />model v{activeBatch}</span>
+          <NavLink to="/profile" className="who">
+            <span className="avatar">{initials(user.name)}</span>
+            <span className="col" style={{ gap: 0, lineHeight: 1.25 }}>
               <span className="strong">{user.name}</span>
               <span className="small muted">{ROLE_LABEL[user.role]}</span>
             </span>

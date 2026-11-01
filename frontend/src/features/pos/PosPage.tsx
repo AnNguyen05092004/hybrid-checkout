@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Camera, Loader2, ScanBarcode, ScanLine, Tags, XCircle } from "lucide-react";
 import { useStore } from "../../app/store";
 import { TrayViewer } from "../../components/TrayViewer";
@@ -14,8 +14,9 @@ import { StepBar } from "./components/StepBar";
 import { FalseAlarmDialog } from "./FalseAlarmDialog";
 import { ManagerPinDialog } from "./ManagerPinDialog";
 import { PaymentDialog } from "./PaymentDialog";
+import { RemoveLineDialog } from "./RemoveLineDialog";
 import { trayBoxes } from "./trayBoxes";
-import { useCheckout, type Mode } from "./useCheckout";
+import { CUSTOMER_DECLINED, useCheckout, type Mode } from "./useCheckout";
 
 interface PinRequest {
   title: string;
@@ -25,9 +26,10 @@ interface PinRequest {
 }
 
 const FALSE_ALARM_REASONS = ["Model nhầm SKU", "Món khách mang theo, không mua", "Vật không phải hàng hóa"];
+const REMOVE_REASONS = [CUSTOMER_DECLINED, "Quét nhầm mã", "Quét trùng"];
 
 const MODE_HINT: Record<Mode, string> = {
-  VERIFY: "Quét mã từng món, camera kiểm tra khay trước khi thanh toán",
+  VERIFY: "Camera chụp khay khi khách đặt hàng xuống, đối chiếu khi bấm Thanh toán",
   FAST: "Camera nhận diện cả khay, chỉ quét món không chắc",
 };
 
@@ -40,7 +42,10 @@ export function PosPage() {
   const [allLabels, setAllLabels] = useState(false);
   const [pin, setPin] = useState<PinRequest | null>(null);
   const [falseAlarm, setFalseAlarm] = useState<TrayAlert | null>(null);
+  const [removing, setRemoving] = useState<TxLine | null>(null);
   const [paying, setPaying] = useState(false);
+  // Pay pressed in the cross-check: the comparison runs first, the dialog opens if nothing blocks.
+  const [payAfterCheck, setPayAfterCheck] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const focusInput = () => setTimeout(() => inputRef.current?.focus(), 0);
 
@@ -58,16 +63,22 @@ export function PosPage() {
     focusInput();
   };
 
+  useEffect(() => {
+    if (!payAfterCheck || !co.checked) return;
+    setPayAfterCheck(false);
+    if (!co.payBlocker) setPaying(true);
+  }, [payAfterCheck, co.checked, co.payBlocker]);
+
+  const onPay = () => {
+    if (co.mode === "VERIFY" && !co.checked && !co.skipped) {
+      co.check();
+      setPayAfterCheck(true);
+    } else setPaying(true);
+  };
+
   const alertSummary = (a: TrayAlert) => `${ALERT_LABEL[a.type]}: ${sku((a.seenSku ?? a.scannedSku)!).name} × ${a.qty}`;
 
-
-
-  const askRemoveLine = (l: TxLine) => setPin({
-    title: "Xóa dòng",
-    summary: `${sku(l.skuId).name} × ${l.qty} (${money(l.qty * l.price)})`,
-    reasons: ["Khách không lấy nữa", "Quét nhầm mã", "Quét trùng"],
-    run: (reason, manager) => { co.removeLine(l); log("DELETE_LINE", co.counter.name, `${manager}: ${sku(l.skuId).name} — ${reason}`); },
-  });
+  const lineSummary = (l: TxLine) => `${sku(l.skuId).name} × ${l.qty} (${money(l.qty * l.price)})`;
 
   const askCancel = () => setPin({
     title: "Hủy giao dịch",
@@ -104,7 +115,7 @@ export function PosPage() {
         <StepBar mode={co.mode} step={co.step} />
 
         <div className="tray-wrap">
-          {co.phase === "done" && (
+          {co.phase === "done" && (co.mode === "FAST" || co.checked) && (
             <div className="tray-tools">
               <button className="btn sm" onClick={() => setAllLabels(!allLabels)} aria-pressed={allLabels}>
                 <Tags size={14} /> {allLabels ? "Ẩn tên món khớp" : "Hiện tên mọi món"}
@@ -124,21 +135,26 @@ export function PosPage() {
               co.phase === "loading" ? <span className="row"><Loader2 className="spin" /> Đang chụp và nhận diện…</span> :
               co.phase === "error" ? <span className="col" style={{ alignItems: "center", color: "#fecaca" }}><XCircle size={36} />Không lấy được ảnh từ camera ({co.failures} lần)</span> :
               <span className="col" style={{ alignItems: "center", gap: 6 }}><Camera size={36} />
-                {co.mode === "VERIFY" ? "Quét mã xong, bấm Kiểm tra khay" : "Khách đặt cả khay, bấm Nhận diện khay"}</span>
+                {co.mode === "VERIFY" ? "Khách đặt hàng lên quầy: camera tự chụp khay" : "Khách đặt cả khay, bấm Nhận diện khay"}</span>
             }
           />
         </div>
 
-        <div className="row">
-          <button className="btn primary lg" style={{ flex: 1 }} onClick={() => { setFocusAlert(null); co.capture(); focusInput(); }}
-            disabled={co.phase === "loading" || (co.mode === "VERIFY" ? co.lines.length === 0 : co.phase === "done")}>
-            <ScanLine size={20} />
-            {co.mode === "FAST" ? "Nhận diện khay" : co.phase === "done" ? "Kiểm tra lại khay" : "Kiểm tra khay"}
-          </button>
-          {co.phase === "error" && co.failures >= 2 && !co.skipped && (
-            <button className="btn lg" onClick={askSkip}>Bỏ qua kiểm tra (cần QL)</button>
-          )}
-        </div>
+        {co.mode === "VERIFY" && co.phase === "done" && !co.checked && (
+          <div className="small muted">Ảnh chụp lúc khách đặt hàng. Hệ thống đối chiếu với danh sách đã quét khi bấm <b>Thanh toán</b>.</div>
+        )}
+        {(co.mode === "FAST" || co.phase === "error") && (
+          <div className="row">
+            <button className="btn primary lg" style={{ flex: 1 }} onClick={() => { setFocusAlert(null); co.capture(); focusInput(); }}
+              disabled={co.phase === "loading" || (co.mode === "FAST" && co.phase === "done")}>
+              <ScanLine size={20} />
+              {co.mode === "FAST" ? "Nhận diện khay" : "Chụp lại khay"}
+            </button>
+            {co.phase === "error" && co.failures >= 2 && !co.skipped && (
+              <button className="btn lg" onClick={askSkip}>Bỏ qua kiểm tra (cần QL)</button>
+            )}
+          </div>
+        )}
 
         <DeviceSimulator co={co} />
       </div>
@@ -155,12 +171,22 @@ export function PosPage() {
 
         <ReviewList co={co} onPick={focusInput} />
         <AlertList co={co} focus={focusAlert} onFocus={setFocusAlert} onScanMore={focusInput} onFalseAlarm={setFalseAlarm} />
-        <CartPanel co={co} onRemove={askRemoveLine} onCancel={askCancel} onPay={() => setPaying(true)} />
+        <CartPanel co={co} onRemove={setRemoving} onCancel={askCancel} onPay={onPay} />
       </div>
 
       {pin && (
         <ManagerPinDialog title={pin.title} summary={pin.summary} reasons={pin.reasons} onClose={() => setPin(null)}
           onConfirm={(reason, manager) => { pin.run(reason, manager); setPin(null); focusInput(); }} />
+      )}
+      {removing && (
+        <RemoveLineDialog summary={lineSummary(removing)} reasons={REMOVE_REASONS}
+          onClose={() => setRemoving(null)}
+          onConfirm={(reason) => {
+            co.removeLine(removing, reason);
+            log("DELETE_LINE", co.counter.name, `${lineSummary(removing)} — ${reason}`);
+            setRemoving(null);
+            focusInput();
+          }} />
       )}
       {falseAlarm && (
         <FalseAlarmDialog summary={alertSummary(falseAlarm)} reasons={FALSE_ALARM_REASONS}

@@ -175,25 +175,29 @@ export function LabelingPage() {
             <CheckCheck size={14} /> Chấp nhận ≥ {BULK_THRESHOLD}</button>} bodyClass="">
             <div style={{ maxHeight: 460, overflowY: "auto" }}>
               {proposals.map((p) => (
-                <div key={p.id} className="line" style={{ gridTemplateColumns: "1fr auto", background: selected === p.id ? "var(--primary-soft)" : undefined, cursor: "pointer" }} onClick={() => setSelected(p.id)}>
-                  <span>
-                    <div className="small strong">{sku(p.skuId).name}</div>
-                    <div className="row small faint" style={{ gap: 6 }}>Đề xuất · {p.score.toFixed(2)}
+                <div key={p.id} className={`prop${selected === p.id ? " sel" : ""}`} onClick={() => setSelected(p.id)}>
+                  <div>
+                    <div className="small strong ellipsis">{sku(p.skuId).name}</div>
+                    <div className="meta">
+                      <span className="score">đề xuất {p.score.toFixed(2)}</span>
                       {state(p.id) === "accepted" && <Badge tone="ok">Chấp nhận</Badge>}
                       {state(p.id) === "rejected" && <Badge tone="danger">{states[p.id] ? "Từ chối" : "Thay bằng box vẽ"}</Badge>}
                       {p.score < BULK_THRESHOLD && state(p.id) === "pending" && <Badge tone="warn">Cần xem kỹ</Badge>}
                     </div>
-                  </span>
-                  <span className="row" onClick={(e) => e.stopPropagation()}>
-                    <button className="btn sm ghost" aria-label="Chấp nhận" onClick={() => setStates({ ...states, [p.id]: "accepted" })}><Check size={14} /></button>
-                    <button className="btn sm ghost" aria-label="Từ chối" onClick={() => setStates({ ...states, [p.id]: "rejected" })}><X size={14} /></button>
+                  </div>
+                  <span className="acts" onClick={(e) => e.stopPropagation()}>
+                    <button className={`btn sm ghost${state(p.id) === "accepted" ? " on" : ""}`} aria-label="Chấp nhận" title="Chấp nhận (A)" onClick={() => setStates({ ...states, [p.id]: "accepted" })}><Check size={14} /></button>
+                    <button className={`btn sm ghost${state(p.id) === "rejected" ? " on" : ""}`} aria-label="Từ chối" title="Từ chối (Del)" onClick={() => setStates({ ...states, [p.id]: "rejected" })}><X size={14} /></button>
                   </span>
                 </div>
               ))}
               {drawn.map((d) => (
-                <div key={d.id} className="line" style={{ gridTemplateColumns: "1fr auto", background: selected === d.id ? "var(--primary-soft)" : undefined }} onClick={() => setSelected(d.id)}>
-                  <span><div className="small strong">{sku(d.skuId).name}</div><div className="small faint">Vẽ tay · SKU mới</div></span>
-                  <button className="btn sm ghost" aria-label="Xóa box" onClick={() => setDrawn(drawn.filter((x) => x !== d))}><Trash2 size={14} /></button>
+                <div key={d.id} className={`prop${selected === d.id ? " sel" : ""}`} onClick={() => setSelected(d.id)}>
+                  <div>
+                    <div className="small strong ellipsis">{sku(d.skuId).name}</div>
+                    <div className="meta"><span className="score">vẽ tay</span><Badge tone="info">SKU mới</Badge></div>
+                  </div>
+                  <button className="btn sm ghost" aria-label="Xóa box" onClick={(e) => { e.stopPropagation(); setDrawn(drawn.filter((x) => x !== d)); }}><Trash2 size={14} /></button>
                 </div>
               ))}
             </div>

@@ -1,0 +1,224 @@
+openapi: 3.1.0
+info:
+  title: HybridCheckout Inference API
+  version: 1.0.0
+  summary: API nội bộ của dịch vụ nhận diện — chỉ backend và worker gọi.
+  description: |
+    Dịch vụ bọc model nhận diện đang nghiên cứu (D07: hệ thống không sửa code model). Không lưu trạng thái nghiệp vụ, không truy cập PostgreSQL.
+
+    - Chỉ mở trong mạng nội bộ; mỗi request mang `Authorization: Bearer <INFERENCE_TOKEN>`.
+    - Một tiến trình nạp đúng một checkpoint tại một thời điểm (BR-07). Backend gọi `PUT /model` khi deploy hoặc rollback.
+    - Box chuẩn hóa về 0..1, gốc ở góc trên trái.
+servers:
+  - url: http://inference:9100
+    description: Trong mạng docker compose
+security:
+  - serviceToken: []
+tags:
+  - name: Detection
+    description: Nhận diện SKU trên ảnh khay.
+  - name: Cutout
+    description: Cắt nền ảnh mẫu của SKU mới.
+  - name: Model
+    description: Checkpoint đang nạp.
+  - name: Health
+    description: Kiểm tra sống và sẵn sàng.
+
+paths:
+  /detect:
+    post:
+      tags: [Detection]
+      operationId: detect
+      summary: Nhận diện ảnh khay
+      description: |
+        Trả mọi box có độ tin ≥ `min_score` (backend gửi ngưỡng thấp nhỏ nhất). Ngưỡng cảnh báo, ngưỡng tự nhận và đối chiếu
+        với danh sách quét do backend làm, không phải dịch vụ này. Mục tiêu p95 ≤ 1,5 giây trên GPU để cả lượt chụp khay ≤ 3 giây.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, contentMediaType: image/jpeg, description: 'JPEG từ camera quầy, ≤ 5 MB' }
+                min_score: { type: number, minimum: 0, maximum: 1, default: 0.3 }
+      responses:
+        '200':
+          description: Kết quả nhận diện
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DetectResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+        '503': { $ref: '#/components/responses/NoModel' }
+  /cutouts:
+    post:
+      tags: [Cutout]
+      operationId: cutout
+      summary: Cắt nền một ảnh mẫu
+      description: Worker gọi cho từng ảnh mẫu vừa tải lên (UC17). Trả PNG có kênh alpha, cắt sát sản phẩm.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, contentMediaType: image/jpeg, description: 'JPEG hoặc PNG, ≤ 10 MB' }
+      responses:
+        '200':
+          description: Ảnh đã cắt nền
+          headers:
+            X-Mask-Quality:
+              description: Điểm chất lượng mặt nạ 0..1; backend gắn "Cần xem kỹ" khi thấp
+              schema: { type: number, minimum: 0, maximum: 1 }
+          content:
+            image/png:
+              schema: { type: string, contentMediaType: image/png }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '413': { $ref: '#/components/responses/Problem' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /model:
+    get:
+      tags: [Model]
+      operationId: getLoadedModel
+      summary: Checkpoint đang nạp
+      responses:
+        '200':
+          description: Checkpoint đang nạp
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoadedModel' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '503': { $ref: '#/components/responses/NoModel' }
+    put:
+      tags: [Model]
+      operationId: loadModel
+      summary: Nạp checkpoint
+      description: |
+        Tải checkpoint từ kho ảnh, nạp, chạy thử một ảnh rồi mới thay bản cũ. Lỗi ở bất kỳ bước nào thì bản cũ vẫn chạy,
+        nên backend chỉ ghi deploy vào cơ sở dữ liệu sau khi nhận 200.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoadModelRequest' }
+      responses:
+        '200':
+          description: Đã nạp và chạy thử
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoadedModel' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Problem' }
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Sống và sẵn sàng
+      description: '`ready` false khi chưa nạp checkpoint; khi đó backend vẫn cho bán bằng mã vạch.'
+      security: []
+      responses:
+        '200':
+          description: Trạng thái
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Token dùng chung giữa backend và dịch vụ nhận diện, đặt qua biến môi trường `INFERENCE_TOKEN`.
+
+  responses:
+    Unauthorized:
+      description: '`UNAUTHENTICATED`'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Problem:
+      description: '`IMAGE_TOO_LARGE`, `IMAGE_INVALID`, `CHECKPOINT_INVALID`, …'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NoModel:
+      description: '`NO_MODEL_LOADED`'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string }
+    Box:
+      type: object
+      required: [x, y, w, h]
+      properties:
+        x: { type: number, minimum: 0, maximum: 1 }
+        y: { type: number, minimum: 0, maximum: 1 }
+        w: { type: number, exclusiveMinimum: 0, maximum: 1 }
+        h: { type: number, exclusiveMinimum: 0, maximum: 1 }
+    DetectResponse:
+      type: object
+      required: [model_version_id, image_width, image_height, latency_ms, detections]
+      properties:
+        model_version_id: { type: integer, format: int64, description: Phiên bản đã chạy, backend lưu vào `tray_captures` (BR-06) }
+        image_width: { type: integer }
+        image_height: { type: integer }
+        latency_ms: { type: integer, description: Chỉ phần suy luận }
+        detections:
+          type: array
+          items:
+            type: object
+            required: [sku_id, class_index, score, box]
+            properties:
+              sku_id: { type: integer, format: int64, description: Tra từ class map của checkpoint }
+              class_index: { type: integer }
+              score: { type: number, minimum: 0, maximum: 1 }
+              box: { $ref: '#/components/schemas/Box' }
+    LoadModelRequest:
+      type: object
+      required: [model_version_id, code, checkpoint_uri, class_map]
+      properties:
+        model_version_id: { type: integer, format: int64 }
+        code: { type: string, examples: [v5] }
+        checkpoint_uri: { type: string, examples: ['s3://checkpoints/v5/'] }
+        class_map:
+          type: array
+          description: Từ `model_version_skus`
+          minItems: 1
+          items:
+            type: object
+            required: [class_index, sku_id]
+            properties:
+              class_index: { type: integer, minimum: 0 }
+              sku_id: { type: integer, format: int64 }
+    LoadedModel:
+      type: object
+      required: [model_version_id, code, checkpoint_uri, classes, device, loaded_at]
+      properties:
+        model_version_id: { type: integer, format: int64 }
+        code: { type: string }
+        checkpoint_uri: { type: string }
+        classes: { type: integer }
+        device: { type: string, examples: [cuda:0] }
+        loaded_at: { type: string, format: date-time }
+    Health:
+      type: object
+      required: [status, ready, model_version_id]
+      properties:
+        status: { type: string, enum: [ok] }
+        ready: { type: boolean }
+        model_version_id: { type: [integer, 'null'], format: int64 }

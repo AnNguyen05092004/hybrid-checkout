@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { X } from "lucide-react";
 import { useStore, type LearnStatus, type VersionStatus } from "../app/store";
 import type { BatchStatus, Job, Resolution, Review } from "../mocks/seed";
@@ -89,43 +89,60 @@ export function Toasts() {
 }
 
 export function DemoNote({ children }: { children: ReactNode }) {
-  return <div className="demo-note">{children}</div>;
+  return <div className="demo-note"><span className="tag">Prototype</span><span>{children}</span></div>;
+}
+
+/** Logo: a barcode in a white tile. */
+export function Brand() {
+  return <span className="brand"><span className="brand-mark"><i /></span>HybridCheckout</span>;
+}
+
+/** Long tables show `step` rows at a time; returns the visible rows and the "show more" footer. */
+export function useShowMore<T>(rows: T[], step = 20): [T[], ReactNode] {
+  const [n, setN] = useState(step);
+  const more = rows.length > n && (
+    <div className="more">
+      <button className="btn sm" onClick={() => setN(n + step)}>Xem thêm {Math.min(step, rows.length - n)}</button>
+      <span className="small faint">Đang hiện {n}/{rows.length}</span>
+    </div>
+  );
+  return [rows.slice(0, n), more];
 }
 
 /* Status badges: each status has a text label, the colour is only a second cue. */
 
 const LEARN: Record<LearnStatus, [string, string]> = {
-  DA_HOC: ["ok", "Đã học"], DANG_HOC: ["info", "Đang học"], CHUA_HOC: ["warn", "Chưa học"],
+  LEARNED: ["ok", "Đã học"], LEARNING: ["info", "Đang học"], NOT_LEARNED: ["warn", "Chưa học"],
 };
 export const LearnBadge = ({ status }: { status: LearnStatus }) => <Badge tone={LEARN[status][0]}>{LEARN[status][1]}</Badge>;
 
 const VERSION: Record<VersionStatus, [string, string]> = {
-  ACTIVE: ["ok", "Đang chạy"], SAN_SANG: ["info", "Chờ duyệt"], DA_THAY_THE: ["", "Đã thay thế"],
-  BI_TU_CHOI: ["danger", "Bị từ chối"], CHUA_CO: ["", "Chưa có"],
+  ACTIVE: ["ok", "Đang chạy"], PENDING_REVIEW: ["info", "Chờ duyệt"], RETIRED: ["", "Đã thay thế"],
+  REJECTED: ["danger", "Bị từ chối"], NOT_TRAINED: ["", "Chưa có"],
 };
 export const VersionBadge = ({ status }: { status: VersionStatus }) => <Badge tone={VERSION[status][0]}>{VERSION[status][1]}</Badge>;
 
 export const BATCH_STEPS: { status: BatchStatus; label: string }[] = [
-  { status: "NHAP", label: "Tạo đợt" },
-  { status: "THU_THAP", label: "Thu thập dữ liệu" },
-  { status: "DANG_HUAN_LUYEN", label: "Huấn luyện" },
-  { status: "CHO_DUYET", label: "Chờ duyệt" },
-  { status: "DA_DEPLOY", label: "Đã deploy" },
+  { status: "DRAFT", label: "Tạo đợt" },
+  { status: "COLLECTING", label: "Thu thập dữ liệu" },
+  { status: "TRAINING", label: "Huấn luyện" },
+  { status: "PENDING_REVIEW", label: "Chờ duyệt" },
+  { status: "DEPLOYED", label: "Đã deploy" },
 ];
 const BATCH: Record<BatchStatus, [string, string]> = {
-  NHAP: ["", "Nháp"], THU_THAP: ["info", "Thu thập dữ liệu"],
-  DANG_HUAN_LUYEN: ["warn", "Đang huấn luyện"], CHO_DUYET: ["primary", "Chờ duyệt"], DA_DEPLOY: ["ok", "Đã deploy"],
+  DRAFT: ["", "Nháp"], COLLECTING: ["info", "Thu thập dữ liệu"],
+  TRAINING: ["warn", "Đang huấn luyện"], PENDING_REVIEW: ["primary", "Chờ duyệt"], DEPLOYED: ["ok", "Đã deploy"],
 };
 export const BatchBadge = ({ status }: { status: BatchStatus }) => <Badge tone={BATCH[status][0]}>{BATCH[status][1]}</Badge>;
 
 const JOB: Record<Job["status"], [string, string]> = {
-  CHO: ["", "Chờ"], DANG_CHAY: ["warn", "Đang chạy"], DANG_DANH_GIA: ["info", "Đang đánh giá"], XONG: ["ok", "Xong"], LOI: ["danger", "Lỗi"],
+  QUEUED: ["", "Chờ"], RUNNING: ["warn", "Đang chạy"], EVALUATING: ["info", "Đang đánh giá"], SUCCEEDED: ["ok", "Xong"], FAILED: ["danger", "Lỗi"],
 };
 export const JobBadge = ({ status }: { status: Job["status"] }) => <Badge tone={JOB[status][0]}>{JOB[status][1]}</Badge>;
 
 export const RESOLUTION_LABEL: Record<Resolution, string> = {
-  MO: "Đang mở", DA_QUET_BO_SUNG: "Đã quét bổ sung", BAO_NHAM: "Thu ngân báo nhầm", TU_DONG: "Tự đóng (mức thấp)",
+  OPEN: "Đang mở", SCANNED: "Đã quét bổ sung", FALSE_ALARM: "Thu ngân báo nhầm", AUTO_CLOSED: "Tự đóng khi thanh toán",
 };
 export const REVIEW_LABEL: Record<Review, string> = {
-  XAC_NHAN_DUNG: "Cảnh báo đúng", BAO_NHAM_THAT: "Báo nhầm thật", NGHI_GIAN_LAN: "Nghi gian lận",
+  ALERT_CORRECT: "Cảnh báo đúng", MODEL_ERROR: "Báo nhầm thật", SUSPECTED_FRAUD: "Nghi gian lận",
 };

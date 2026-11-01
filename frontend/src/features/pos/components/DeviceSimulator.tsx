@@ -11,7 +11,7 @@ import type { Checkout } from "../useCheckout";
  */
 export function DeviceSimulator({ co }: { co: Checkout }) {
   const { skus } = useStore();
-  const { tray, trayId, setTrayId, nextTray, lines, phase, scanned, scan, isLearned } = co;
+  const { tray, trayId, setTrayId, nextTray, lines, phase, scanned, scan, isLearned, mode, capture } = co;
   const locked = lines.length > 0 || phase !== "idle";
   const onTray = new Map<number, number>();
   tray.objects.forEach((o) => onTray.set(o.rpcId, (onTray.get(o.rpcId) ?? 0) + 1));
@@ -21,8 +21,8 @@ export function DeviceSimulator({ co }: { co: Checkout }) {
 
   return (
     <details className="sim" open>
-      <summary className="small strong row" style={{ color: "var(--info)", cursor: "pointer" }}>
-        <Cpu size={14} /> Mô phỏng thiết bị — khay trên quầy và máy quét (chỉ có trong prototype)
+      <summary className="small strong row" style={{ cursor: "pointer" }}>
+        <span className="tag">Prototype</span><Cpu size={14} /> Mô phỏng thiết bị: khay trên quầy và máy quét
       </summary>
       <div className="col" style={{ marginTop: 10 }}>
         <div className="row wrap">
@@ -34,6 +34,10 @@ export function DeviceSimulator({ co }: { co: Checkout }) {
             ))}
           </select>
           <button className="btn sm" disabled={locked} onClick={nextTray}>Khay khác</button>
+          {mode === "VERIFY" && (
+            <button className="btn sm" disabled={phase !== "idle"} onClick={capture}
+              title="Camera tự chụp khi khách đặt hàng xuống; quét món đầu tiên cũng kích hoạt chụp">Khách đặt khay lên quầy</button>
+          )}
           <button className="btn sm" onClick={scanAll}>Quét hết</button>
           {tray.objects.some((o) => !isLearned(o.rpcId)) && <Badge tone="warn">Có hàng mới chưa học</Badge>}
         </div>

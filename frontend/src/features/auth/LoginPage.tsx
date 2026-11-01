@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Boxes, Eye, EyeOff, ScanBarcode, Camera, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, ScanBarcode, Camera, ShieldCheck } from "lucide-react";
 import { useStore } from "../../app/store";
+import { Brand } from "../../components/ui";
 import { HOME } from "../../app/home";
 import { DEMO_USER, ROLE_LABEL, type Role } from "../../mocks/seed";
 
@@ -30,24 +31,28 @@ export function LoginPage() {
   };
 
   return (
-    <div style={{ minHeight: "100%", display: "grid", gridTemplateColumns: "1.1fr 1fr" }}>
-      <section style={{ background: "#0b2b2b", color: "#e2efee", padding: 48, display: "flex", flexDirection: "column", gap: 28, justifyContent: "center" }}>
-        <div className="row" style={{ fontSize: 22, fontWeight: 700, color: "#fff" }}><Boxes size={28} /> HybridCheckout</div>
-        <h1 style={{ fontSize: 34, lineHeight: 1.25, color: "#fff", maxWidth: 520 }}>Mã vạch tính tiền,<br />camera kiểm tra khay.</h1>
-        <p style={{ maxWidth: 520, color: "#a9c7c5", fontSize: 15 }}>
-          Hệ thống thanh toán tại quầy kết hợp mã vạch và thị giác máy tính: phát hiện món chưa quét trước khi khách trả tiền,
-          làn nhanh cho khay nhiều món, và cập nhật model khi cửa hàng nhập hàng mới.
-        </p>
-        <div className="col" style={{ gap: 12, color: "#cfe3e2" }}>
-          <span className="row"><ScanBarcode size={18} /> Kiểm tra chéo danh sách quét với ảnh khay</span>
-          <span className="row"><Camera size={18} /> Làn nhanh: camera đề xuất, thu ngân quét bổ sung</span>
-          <span className="row"><ShieldCheck size={18} /> Cảnh báo nghiêm trọng cần quản lý xác nhận</span>
+    <div className="login">
+      <section className="login-art">
+        <span style={{ color: "#fff", fontSize: 17 }}><Brand /></span>
+        <div className="col" style={{ gap: 24 }}>
+          <span className="scanframe" style={{ alignSelf: "flex-start" }}><span className="barcode" style={{ display: "block" }} /></span>
+          <h1>Mã vạch tính tiền.<br /><em>Camera kiểm tra khay.</em></h1>
+          <p className="lead">
+            Thanh toán tại quầy kết hợp mã vạch và thị giác máy tính: phát hiện món chưa quét trước khi khách trả tiền,
+            làn nhanh cho khay nhiều món, và cập nhật model khi cửa hàng nhập hàng mới.
+          </p>
+        </div>
+        <div className="feat">
+          <div><ScanBarcode size={18} color="#fff" /><span><b>Kiểm tra chéo</b><br />Danh sách quét so với ảnh khay</span></div>
+          <div><Camera size={18} color="#fff" /><span><b>Làn nhanh</b><br />Camera đề xuất, thu ngân quét bổ sung</span></div>
+          <div><ShieldCheck size={18} color="#fff" /><span><b>PIN quản lý</b><br />Cảnh báo nghiêm trọng cần xác nhận</span></div>
         </div>
       </section>
       <section style={{ display: "grid", placeItems: "center", padding: 32 }}>
         <div className="col" style={{ width: "min(380px, 100%)", gap: 20 }}>
           <div>
-            <h1>Đăng nhập</h1>
+            <span className="eyebrow">Tài khoản nội bộ</span>
+            <h1 style={{ marginTop: 6 }}>Đăng nhập</h1>
             <p className="muted" style={{ marginTop: 6 }}>Dùng tài khoản do quản trị viên cấp.</p>
           </div>
           <form className="col" style={{ gap: 14 }} onSubmit={submit}>
@@ -67,7 +72,7 @@ export function LoginPage() {
             <button className="btn primary lg block" type="submit">Đăng nhập</button>
           </form>
           <div className="sim col">
-            <span className="small strong" style={{ color: "var(--info)" }}>Tài khoản demo (chỉ có trong prototype)</span>
+            <span className="row small muted"><span className="tag">Prototype</span>Vào nhanh bằng tài khoản demo</span>
             <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {(Object.keys(DEMO_USER) as Role[]).map((r) => (
                 <button key={r} className="btn" onClick={() => enter(r)}>{ROLE_LABEL[r]}</button>

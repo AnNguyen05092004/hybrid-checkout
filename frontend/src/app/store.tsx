@@ -13,8 +13,8 @@ import {
 import { TRAYS } from "../mocks/trays";
 import { CUTOUT_REVIEW_BELOW } from "./rules";
 
-export type LearnStatus = "DA_HOC" | "DANG_HOC" | "CHUA_HOC";
-export type VersionStatus = "ACTIVE" | "SAN_SANG" | "DA_THAY_THE" | "BI_TU_CHOI" | "CHUA_CO";
+export type LearnStatus = "LEARNED" | "LEARNING" | "NOT_LEARNED";
+export type VersionStatus = "ACTIVE" | "PENDING_REVIEW" | "RETIRED" | "REJECTED" | "NOT_TRAINED";
 
 export interface Thresholds {
   alert: number;
@@ -22,10 +22,10 @@ export interface Thresholds {
   low: number;
 }
 
-export type CutoutState = "accepted" | "rejected";
+export type CutoutState = "ACCEPTED" | "REJECTED";
 
 export interface Composites {
-  status: "NONE" | "RUNNING" | "DONE";
+  status: "NONE" | "RUNNING" | "SUCCEEDED";
   count: number;
 }
 
@@ -55,7 +55,7 @@ function initialCutoutState(): Record<string, CutoutState> {
   batchSkus.forEach((skuId) => {
     const own = CUTOUTS.filter((c) => c.skuId === skuId);
     const worst = own.reduce((a, b) => (b.quality < a.quality ? b : a));
-    own.forEach((c) => (out[c.id] = c === worst && c.quality < CUTOUT_REVIEW_BELOW ? "rejected" : "accepted"));
+    own.forEach((c) => (out[c.id] = c === worst && c.quality < CUTOUT_REVIEW_BELOW ? "REJECTED" : "ACCEPTED"));
   });
   return out;
 }
@@ -135,7 +135,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [skus, setSkus] = useState<Sku[]>(SKUS);
   const [activeBatch, setActiveBatch] = useState(4);
   const [versionStatus, setVersionStatus] = useState<Record<string, VersionStatus>>({
-    v1: "DA_THAY_THE", v2: "DA_THAY_THE", v3: "DA_THAY_THE", v4: "ACTIVE", v5: "CHUA_CO",
+    v1: "RETIRED", v2: "RETIRED", v3: "RETIRED", v4: "ACTIVE", v5: "NOT_TRAINED",
   });
   const [versionCreatedAt, setVersionCreatedAt] = useState<Record<string, string>>(
     Object.fromEntries(MODEL_VERSIONS.map((v) => [v.id, v.createdAt])));
@@ -169,24 +169,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   // Simulated training job: 16 epochs, then evaluation, then a new model version ready for review.
   useEffect(() => {
-    const running = jobs.find((j) => j.status === "DANG_CHAY" || j.status === "DANG_DANH_GIA");
+    const running = jobs.find((j) => j.status === "RUNNING" || j.status === "EVALUATING");
     if (!running) return;
     const timer = setTimeout(() => {
       setJobs((js) => js.map((j) => {
         if (j.id !== running.id) return j;
-        if (j.status === "DANG_CHAY" && j.epoch < j.epochs) {
+        if (j.status === "RUNNING" && j.epoch < j.epochs) {
           return { ...j, epoch: j.epoch + 1, gpuHours: +(j.gpuHours + 5.9 / 16).toFixed(2), log: [...j.log, `Epoch ${j.epoch + 1}/${j.epochs} xong`] };
         }
-        if (j.status === "DANG_CHAY") return { ...j, status: "DANG_DANH_GIA", log: [...j.log, "Đánh giá trên tập kiểm tra ảnh thật của các đợt 1–5"] };
-        return { ...j, status: "XONG", finishedAt: new Date().toISOString(), log: [...j.log, "Đăng ký phiên bản v5 — chờ duyệt"] };
+        if (j.status === "RUNNING") return { ...j, status: "EVALUATING", log: [...j.log, "Đánh giá trên tập kiểm tra ảnh thật của các đợt 1–5"] };
+        return { ...j, status: "SUCCEEDED", finishedAt: new Date().toISOString(), log: [...j.log, "Đăng ký phiên bản v5 — chờ duyệt"] };
       }));
-      if (running.status === "DANG_DANH_GIA") {
-        setVersionStatus((v) => ({ ...v, v5: "SAN_SANG" }));
+      if (running.status === "EVALUATING") {
+        setVersionStatus((v) => ({ ...v, v5: "PENDING_REVIEW" }));
         setVersionCreatedAt((v) => ({ ...v, v5: new Date().toISOString() }));
-        setBatchStatus(running.batch, "CHO_DUYET");
+        setBatchStatus(running.batch, "PENDING_REVIEW");
         toast("Job huấn luyện đợt 5 đã xong: phiên bản v5 chờ duyệt.");
       }
-    }, running.status === "DANG_CHAY" ? 450 : 1200);
+    }, running.status === "RUNNING" ? 450 : 1200);
     return () => clearTimeout(timer);
   }, [jobs, toast]);
 
@@ -208,7 +208,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       log("CREATE_SKU", s.name, `Thêm SKU mới, mã ${s.barcode}`);
     },
     updateSku: (id, patch) => setSkus((all) => all.map((s) => (s.id === id ? { ...s, ...patch } : s))),
-    learnStatus: (s) => (s.task === 0 ? "CHUA_HOC" : s.task <= activeBatch ? "DA_HOC" : "DANG_HOC"),
+    learnStatus: (s) => (s.task === 0 ? "NOT_LEARNED" : s.task <= activeBatch ? "LEARNED" : "LEARNING"),
     isLearned: (id) => {
       const s = skus.find((x) => x.id === id);
       return !!s && s.task > 0 && s.task <= activeBatch;
@@ -219,29 +219,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     versionCreatedAt,
     deploy: (vid, reason) => {
       const v = MODEL_VERSIONS.find((m) => m.id === vid)!;
-      setVersionStatus((st) => ({ ...st, [`v${activeBatch}`]: "DA_THAY_THE", [vid]: "ACTIVE" }));
+      setVersionStatus((st) => ({ ...st, [`v${activeBatch}`]: "RETIRED", [vid]: "ACTIVE" }));
       setActiveBatch(v.batch);
-      setBatchStatus(v.batch, "DA_DEPLOY", { deployedAt: new Date().toISOString() });
+      setBatchStatus(v.batch, "DEPLOYED", { deployedAt: new Date().toISOString() });
       log("DEPLOY_MODEL", vid, reason ? `Deploy ${v.name}, override: ${reason}` : `Deploy ${v.name}, đạt cổng duyệt`);
       toast(`Đã deploy ${v.name}. Quầy dùng model mới, ${v.skuCount} SKU được camera kiểm tra.`);
     },
     rollback: () => {
       const cur = `v${activeBatch}`;
-      setVersionStatus((st) => ({ ...st, [cur]: "SAN_SANG", [`v${activeBatch - 1}`]: "ACTIVE" }));
-      setBatchStatus(activeBatch, "CHO_DUYET", { deployedAt: undefined });
+      setVersionStatus((st) => ({ ...st, [cur]: "PENDING_REVIEW", [`v${activeBatch - 1}`]: "ACTIVE" }));
+      setBatchStatus(activeBatch, "PENDING_REVIEW", { deployedAt: undefined });
       setActiveBatch(activeBatch - 1);
       log("ROLLBACK_MODEL", cur, `Rollback ${cur} → v${activeBatch - 1}`);
-      toast(`Đã rollback về v${activeBatch - 1}. SKU của đợt ${activeBatch} quay về chưa học.`);
+      toast(`Đã rollback về v${activeBatch - 1}. SKU của đợt ${activeBatch} quay về đang học.`);
     },
     reject: (vid) => {
-      setVersionStatus((st) => ({ ...st, [vid]: "BI_TU_CHOI" }));
+      setVersionStatus((st) => ({ ...st, [vid]: "REJECTED" }));
       log("REJECT_MODEL", vid, "Từ chối phiên bản");
     },
 
     batches,
     createBatch: (name, skuIds) => {
       const id = Math.max(...batches.map((b) => b.id)) + 1;
-      setBatches((bs) => [...bs, { id, name, status: "NHAP", createdAt: new Date().toISOString(), createdBy: user?.name ?? "" }]);
+      setBatches((bs) => [...bs, { id, name, status: "DRAFT", createdAt: new Date().toISOString(), createdBy: user?.name ?? "" }]);
       setSkus((all) => all.map((s) => (skuIds.includes(s.id) ? { ...s, task: id } : s)));
       log("CREATE_BATCH", `Đợt ${id}`, `Tạo đợt "${name}" với ${skuIds.length} SKU`);
       toast(`Đã tạo đợt ${id}.`);
@@ -266,17 +266,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     generateComposites: (batchId) => {
       setComposites({ status: "RUNNING", count: 0 });
       setTimeout(() => {
-        setComposites({ status: "DONE", count: COMPOSITES_PER_BATCH });
+        setComposites({ status: "SUCCEEDED", count: COMPOSITES_PER_BATCH });
         toast(`Đã tạo ${COMPOSITES_PER_BATCH.toLocaleString("vi-VN")} ảnh ghép cho đợt ${batchId}.`);
       }, 2500);
       log("GENERATE_COMPOSITES", `Đợt ${batchId}`, "Tạo ảnh ghép từ ảnh mẫu đã duyệt");
     },
     startTraining: (batchId, extraReal) => {
-      setBatchStatus(batchId, "DANG_HUAN_LUYEN");
+      setBatchStatus(batchId, "TRAINING");
       const data = `Dữ liệu: ${composites.count.toLocaleString("vi-VN")} ảnh ghép`
         + (extraReal ? ` + ${extraReal} ảnh thật vượt mức tập kiểm tra` : "");
       setJobs((js) => [{
-        id: `JOB-${batchId}0${batchId}`, batch: batchId, type: "TRAIN", status: "DANG_CHAY", epoch: 0, epochs: 16,
+        id: `JOB-${batchId}0${batchId}`, batch: batchId, type: "TRAIN", status: "RUNNING", epoch: 0, epochs: 16,
         gpuHours: 0, startedAt: new Date().toISOString(),
         log: ["Mô phỏng: dùng checkpoint có sẵn của đợt 5", data, "Khởi động trên GPU"],
       }, ...js]);

@@ -104,13 +104,13 @@ Bố cục 2 cột: trái là ảnh khay, phải là các bước thao tác từ
 
 | Section | Nội dung | TN | QL |
 |---|---|:-:|:-:|
-| Chọn chế độ + các bước | Kiểm tra chéo / Làn nhanh (chỉ đổi khi giỏ trống); thanh 3 bước: Quét mã → Kiểm tra khay → Thanh toán | ✏️ | ✏️ |
+| Chọn chế độ + các bước | Kiểm tra chéo / Làn nhanh (chỉ đổi khi giỏ trống); thanh 3 bước: Quét mã → Đối chiếu khay → Thanh toán | ✏️ | ✏️ |
 | Ô mã vạch | Luôn giữ con trỏ cho máy quét; báo lỗi mã không có / ngừng bán | ✏️ | ✏️ |
-| Ảnh khay | Trước khi kiểm tra: hướng dẫn. Sau khi kiểm tra: box xanh (khớp), đỏ (cảnh báo), xám nét đứt (không chắc) | 👁 | 👁 |
-| Nút Kiểm tra khay | Chụp và đối chiếu; đang xử lý; lỗi + thử lại; sau 2 lỗi: bỏ qua (cần PIN) | ✏️ | ✏️ |
+| Ảnh khay | Camera tự chụp khi khách đặt hàng. Trước khi đối chiếu: chỉ hiện ảnh. Sau khi bấm Thanh toán: box xanh (khớp), đỏ (cảnh báo), xám nét đứt (không chắc) | 👁 | 👁 |
+| Lỗi camera | Không lấy được ảnh: **Chụp lại khay**; sau 2 lỗi: bỏ qua kiểm tra (cần PIN) | ✏️ | ✏️ |
 | Cảnh báo | Thẻ theo mức; bấm để làm nổi trên ảnh; **Quét bổ sung** / **Camera báo nhầm** (hộp thoại chọn lý do, báo rõ sẽ được lưu để hậu kiểm); mức Thấp có **Bỏ qua** | ✏️ | ✏️ |
-| Giỏ hàng | Tên, mã, số lượng, đơn giá; nhãn "Camera chưa nhận diện" cho hàng mới; xóa dòng (cần PIN) | ✏️ | ✏️ |
-| Tổng tiền | Tổng; **Thanh toán** (khóa kèm lý do); **Hủy giao dịch** (cần PIN) | ✏️ | ✏️ |
+| Giỏ hàng | Tên, mã, số lượng, đơn giá; nhãn "Camera chưa nhận diện" cho hàng mới; xóa dòng (thu ngân tự xóa, chọn lý do; "khách không lấy nữa" thì món được trừ khỏi ảnh khi đối chiếu) | ✏️ | ✏️ |
+| Tổng tiền | Tổng; **Thanh toán**: bấm lần đầu là đối chiếu, không có cảnh báo Cao thì mở hộp thoại thanh toán, còn thì khóa kèm lý do; **Hủy giao dịch** (cần PIN) | ✏️ | ✏️ |
 
 ### P03 — Quầy, chế độ Làn nhanh · `/pos`
 Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, quét sau.
@@ -127,7 +127,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 ### P04 — Hộp thoại PIN quản lý
 | Section | Nội dung | Người nhập: QL |
 |---|---|:-:|
-| Việc cần xác nhận | Xóa dòng / hủy giao dịch / bỏ qua kiểm tra, kèm tóm tắt | 👁 |
+| Việc cần xác nhận | Hủy giao dịch / bỏ qua kiểm tra, kèm tóm tắt | 👁 |
 | Lý do | Chọn lý do có sẵn + ghi chú | ✏️ |
 | Bàn phím PIN | 6 số; báo sai, đếm số lần sai | ✏️ |
 

@@ -12,7 +12,7 @@ export function BatchesPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<number[]>([]);
-  const unassigned = skus.filter((s) => learnStatus(s) === "CHUA_HOC");
+  const unassigned = skus.filter((s) => learnStatus(s) === "NOT_LEARNED");
   const canCreate = user?.role === "STORE_MANAGER";
 
   return (

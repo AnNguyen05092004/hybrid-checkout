@@ -13,7 +13,7 @@ export interface Detection {
   box: Box;
 }
 
-export type AlertType = "MON_CHUA_QUET" | "NGHI_TRAO_MA" | "QUET_KHONG_THAY";
+export type AlertType = "UNSCANNED_ITEM" | "SUSPECTED_SWAP" | "SCANNED_NOT_SEEN";
 export type Severity = "HIGH" | "MEDIUM" | "LOW";
 
 export interface TrayAlert {
@@ -38,6 +38,8 @@ export interface ReconcileInput {
   priceOf: (skuId: number) => number;
   alertThreshold: (skuId: number) => number;
   lowThreshold: number;
+  /** Items handed back after the photo (line deleted, "customer declined"): still on the photo, no longer bought. */
+  returned?: Map<number, number>;
 }
 
 export interface ReconcileResult {
@@ -48,11 +50,13 @@ export interface ReconcileResult {
   absorbed: Set<string>;
   /** Detections between the low and the alert threshold: drawn as uncertain only. */
   uncertain: Set<string>;
+  /** Detections of items the customer handed back after the photo. */
+  handedBack: Set<string>;
   seen: Map<number, number>;
 }
 
 export function reconcile(input: ReconcileInput): ReconcileResult {
-  const { scanned, detections, isLearned, categoryOf, priceOf, alertThreshold, lowThreshold } = input;
+  const { scanned, detections, isLearned, categoryOf, priceOf, alertThreshold, lowThreshold, returned } = input;
 
   // 1. Detections counted as "seen", grouped per SKU, most confident first.
   const bySku = new Map<number, Detection[]>();
@@ -66,6 +70,12 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
     }
   }
   for (const list of bySku.values()) list.sort((a, b) => b.score - a.score);
+  // Items the customer handed back left the tray after the photo: drop that many detections of the SKU.
+  const handedBack = new Set<string>();
+  for (const [sku, qty] of returned ?? []) {
+    const list = bySku.get(sku) ?? [];
+    list.splice(0, qty).forEach((d) => handedBack.add(d.id));
+  }
 
   // 2. Difference per learned SKU. The extra detections of a SKU are its least confident ones.
   const excess: { sku: number; det: Detection }[] = [];
@@ -104,7 +114,7 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
     d.qty -= 1;
     const diff = priceOf(e.sku) - priceOf(d.sku);
     push({
-      type: "NGHI_TRAO_MA", severity: diff > 0 ? "HIGH" : "MEDIUM",
+      type: "SUSPECTED_SWAP", severity: diff > 0 ? "HIGH" : "MEDIUM",
       seenSku: e.sku, scannedSku: d.sku, qty: 1, value: Math.max(diff, 0), detectionIds: [e.det.id],
     });
   }
@@ -124,24 +134,24 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
   // 5. Remaining extras: items on the tray that were not scanned.
   for (const e of leftover) {
     if (!missing.has(e.det.id)) continue;
-    push({ type: "MON_CHUA_QUET", severity: "HIGH", seenSku: e.sku, qty: 1, value: priceOf(e.sku), detectionIds: [e.det.id] });
+    push({ type: "UNSCANNED_ITEM", severity: "HIGH", seenSku: e.sku, qty: 1, value: priceOf(e.sku), detectionIds: [e.det.id] });
   }
 
   // 6. Remaining shortfalls: scanned but not seen (bagged, hidden). Logged only.
   for (const d of deficit) {
-    if (d.qty > 0) push({ type: "QUET_KHONG_THAY", severity: "LOW", scannedSku: d.sku, qty: d.qty, value: 0, detectionIds: [] });
+    if (d.qty > 0) push({ type: "SCANNED_NOT_SEEN", severity: "LOW", scannedSku: d.sku, qty: d.qty, value: 0, detectionIds: [] });
   }
 
   const seen = new Map([...bySku].map(([sku, list]) => [sku, list.length]));
   const order: Record<Severity, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
   alerts.sort((a, b) => order[a.severity] - order[b.severity] || b.value - a.value);
-  return { alerts, matched, absorbed, uncertain, seen };
+  return { alerts, matched, absorbed, uncertain, handedBack, seen };
 }
 
 export const ALERT_LABEL: Record<AlertType, string> = {
-  MON_CHUA_QUET: "Món chưa quét",
-  NGHI_TRAO_MA: "Nghi tráo mã",
-  QUET_KHONG_THAY: "Quét nhưng camera không thấy",
+  UNSCANNED_ITEM: "Món chưa quét",
+  SUSPECTED_SWAP: "Nghi tráo mã",
+  SCANNED_NOT_SEEN: "Quét nhưng camera không thấy",
 };
 
 export const SEVERITY_LABEL: Record<Severity, string> = { HIGH: "Cao", MEDIUM: "Trung bình", LOW: "Thấp" };

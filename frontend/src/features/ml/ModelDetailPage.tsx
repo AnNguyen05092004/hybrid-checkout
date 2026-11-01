@@ -14,12 +14,12 @@ export function ModelDetailPage() {
   const [confirm, setConfirm] = useState<"deploy" | "rollback" | null>(null);
   const [reason, setReason] = useState("");
   const v = MODEL_VERSIONS.find((m) => m.id === id);
-  if (!v || versionStatus[v.id] === "CHUA_CO") return <Empty title="Phiên bản chưa tồn tại"><Link to="/models">Về danh sách</Link></Empty>;
+  if (!v || versionStatus[v.id] === "NOT_TRAINED") return <Empty title="Phiên bản chưa tồn tại"><Link to="/models">Về danh sách</Link></Empty>;
 
   const status = versionStatus[v.id];
   const active = MODEL_VERSIONS.find((m) => m.batch === activeBatch)!;
   // A candidate is compared with the running version; other versions with the one before them.
-  const base = status === "SAN_SANG" ? active : MODEL_VERSIONS.find((m) => m.batch === v.batch - 1);
+  const base = status === "PENDING_REVIEW" ? active : MODEL_VERSIONS.find((m) => m.batch === v.batch - 1);
   const gates = [
     { name: "AP50 val không giảm quá 1 điểm", cand: pct(v.ap50, 2), ref: base ? pct(base.ap50, 2) : "—", pass: !base || v.ap50 >= base.ap50 - GATE.maxAp50Drop },
     { name: `Mức quên SKU cũ ≤ ${GATE.maxForgetting} điểm AP50`, cand: "≈ 0", ref: "—", pass: v.forgetting <= GATE.maxForgetting },
@@ -28,7 +28,7 @@ export function ModelDetailPage() {
   ];
   const allPass = gates.every((g) => g.pass);
   const isML = user?.role === "ML_ENGINEER";
-  const canDeploy = status === "SAN_SANG" && v.batch === activeBatch + 1;
+  const canDeploy = status === "PENDING_REVIEW" && v.batch === activeBatch + 1;
   const job = jobs.find((j) => j.batch === v.batch);
 
   return (
@@ -39,7 +39,7 @@ export function ModelDetailPage() {
         {isML && canDeploy && <button className="btn primary" onClick={() => setConfirm("deploy")}><Rocket size={16} /> Deploy</button>}
         {isML && status === "ACTIVE" && v.batch > 1 && <button className="btn" onClick={() => setConfirm("rollback")}><RotateCcw size={16} /> Rollback về v{v.batch - 1}</button>}
       </>} />
-      {status === "SAN_SANG" && !canDeploy && <DemoNote>Chỉ deploy được phiên bản của đợt liền sau phiên bản đang chạy (v{activeBatch + 1}).</DemoNote>}
+      {status === "PENDING_REVIEW" && !canDeploy && <DemoNote>Chỉ deploy được phiên bản của đợt liền sau phiên bản đang chạy (v{activeBatch + 1}).</DemoNote>}
       <div className="grid" style={{ gridTemplateColumns: "minmax(0, 3fr) minmax(0, 2fr)", alignItems: "start" }}>
         <Card title="Cổng duyệt" actions={allPass ? <Badge tone="ok"><CheckCircle2 size={12} /> Đạt tất cả</Badge> : <Badge tone="danger">Có điều kiện không đạt</Badge>} bodyClass="">
           <div className="table-wrap"><table className="table">

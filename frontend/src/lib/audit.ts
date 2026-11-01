@@ -8,7 +8,8 @@ import { hash01 } from "./format";
 export const HIGH_VALUE = 30_000; // alerts worth at least this are always reviewed first
 export const ANOMALY_RATIO = 1.5; // cashier false-alarm rate vs the store rate
 export const ANOMALY_MIN_ALERTS = 5; // too few alerts say nothing about a cashier
-export const RANDOM_SAMPLE = 0.1;
+export const RANDOM_SAMPLE_RATE = 0.1;
+export const ANOMALY_MIN_REMOVALS = 5; // deleted lines a cashier needs before the rate counts
 
 export interface AuditAlert {
   id: string;
@@ -37,18 +38,42 @@ export function cashierStats(alerts: AuditAlert[]): { store: number; cashiers: C
   return { store, cashiers };
 }
 
-export type AuditReason = "GIA_TRI_CAO" | "THU_NGAN_BAT_THUONG" | "MAU_NGAU_NHIEN";
+export interface RemovalStat {
+  cashier: string;
+  transactions: number;
+  removed: number;
+  rate: number;
+  anomalous: boolean;
+}
+
+/**
+ * Cashiers delete lines without a PIN (BR-05), so deletions per transaction are compared with the
+ * store like false alarms; a flagged cashier has their deleted lines reviewed.
+ */
+export function removalStats(txs: { cashier: string; removed: number }[]): { store: number; cashiers: RemovalStat[] } {
+  const store = txs.length ? txs.reduce((s, t) => s + t.removed, 0) / txs.length : 0;
+  const names = [...new Set(txs.map((t) => t.cashier))];
+  const cashiers = names.map((cashier) => {
+    const mine = txs.filter((t) => t.cashier === cashier);
+    const removed = mine.reduce((s, t) => s + t.removed, 0);
+    const rate = removed / mine.length;
+    return { cashier, transactions: mine.length, removed, rate, anomalous: removed >= ANOMALY_MIN_REMOVALS && rate >= store * ANOMALY_RATIO };
+  });
+  return { store, cashiers };
+}
+
+export type AuditReason = "HIGH_VALUE" | "ANOMALOUS_CASHIER" | "RANDOM_SAMPLE";
 
 export const AUDIT_REASON_LABEL: Record<AuditReason, string> = {
-  GIA_TRI_CAO: "Giá trị cao", THU_NGAN_BAT_THUONG: "Thu ngân bất thường", MAU_NGAU_NHIEN: "Mẫu ngẫu nhiên",
+  HIGH_VALUE: "Giá trị cao", ANOMALOUS_CASHIER: "Thu ngân bất thường", RANDOM_SAMPLE: "Mẫu ngẫu nhiên",
 };
 
 /** Why a false alarm should be reviewed first; empty means it can wait. */
 export function auditReasons(a: AuditAlert, anomalous: Set<string>): AuditReason[] {
   const out: AuditReason[] = [];
-  if (a.value >= HIGH_VALUE) out.push("GIA_TRI_CAO");
-  if (anomalous.has(a.cashier)) out.push("THU_NGAN_BAT_THUONG");
-  if (out.length === 0 && hash01(`audit-${a.id}`) < RANDOM_SAMPLE) out.push("MAU_NGAU_NHIEN");
+  if (a.value >= HIGH_VALUE) out.push("HIGH_VALUE");
+  if (anomalous.has(a.cashier)) out.push("ANOMALOUS_CASHIER");
+  if (out.length === 0 && hash01(`audit-${a.id}`) < RANDOM_SAMPLE_RATE) out.push("RANDOM_SAMPLE");
   return out;
 }
 

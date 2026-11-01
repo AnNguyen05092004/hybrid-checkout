@@ -38,10 +38,10 @@ export function BatchDetailPage() {
 
   // Batch 5 is live in the prototype; earlier batches show their final numbers.
   const isCurrent = b.id === 5;
-  const finished = b.status !== "NHAP" && b.status !== "THU_THAP";
+  const finished = b.status !== "DRAFT" && b.status !== "COLLECTING";
   const rows = skus.filter((s) => s.task === b.id).map((s) => ({
     s,
-    cutouts: isCurrent ? cutoutsOf(s.id).filter((c) => cutoutState[c.id] === "accepted").length : finished ? 9 + (s.id % 4) : 0,
+    cutouts: isCurrent ? cutoutsOf(s.id).filter((c) => cutoutState[c.id] === "ACCEPTED").length : finished ? 9 + (s.id % 4) : 0,
     boxes: isCurrent ? approved[s.id] ?? 0 : finished ? 20 + (s.id % 15) : 0,
   }));
   const val = isCurrent ? valImages : finished ? 60 + b.id * 3 : 0;
@@ -56,7 +56,7 @@ export function BatchDetailPage() {
   const stepIndex = BATCH_STEPS.findIndex((s) => s.status === b.status);
   const job = jobs.find((j) => j.batch === b.id);
   const isML = user?.role === "ML_ENGINEER";
-  const collecting = isCurrent && b.status === "THU_THAP";
+  const collecting = isCurrent && b.status === "COLLECTING";
   const vid = `v${b.id}`;
   const remaining = labelQueue.length - labeledTrays.length;
 
@@ -66,8 +66,8 @@ export function BatchDetailPage() {
       <Card>
         <div className="steps">
           {BATCH_STEPS.map((s, i) => (
-            <div key={s.status} className={`step ${i < stepIndex || b.status === "DA_DEPLOY" ? "done" : i === stepIndex ? "cur" : ""}`}>
-              <span className="dotc">{i < stepIndex || b.status === "DA_DEPLOY" ? <Check size={16} /> : i + 1}</span>
+            <div key={s.status} className={`step ${i < stepIndex || b.status === "DEPLOYED" ? "done" : i === stepIndex ? "cur" : ""}`}>
+              <span className="dotc">{i < stepIndex || b.status === "DEPLOYED" ? <Check size={16} /> : i + 1}</span>
               <span className="small strong">{s.label}</span>
             </div>
           ))}
@@ -138,7 +138,7 @@ export function BatchDetailPage() {
                 <Progress value={(job.epoch / job.epochs) * 100} />
                 <span className="small muted">Epoch {job.epoch}/{job.epochs} · {job.gpuHours} giờ GPU · bắt đầu {dateTime(job.startedAt)}</span>
                 {isML && <Link to="/jobs" className="small">Xem log</Link>}
-                {versionStatus[vid] !== "CHUA_CO" && <div className="row"><Link to={`/models/${vid}`}>Phiên bản {vid}</Link><span className="spacer" /><VersionBadge status={versionStatus[vid]} /></div>}
+                {versionStatus[vid] !== "NOT_TRAINED" && <div className="row"><Link to={`/models/${vid}`}>Phiên bản {vid}</Link><span className="spacer" /><VersionBadge status={versionStatus[vid]} /></div>}
               </div>
             ) : <span className="small muted">Chưa có job.</span>}
           </Card>

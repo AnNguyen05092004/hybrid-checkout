@@ -52,7 +52,7 @@ flowchart TB
     sys ~~~ g
 
     classDef actor fill:#475569,color:#fff,stroke:#334155
-    classDef box fill:#eef6f6,stroke:#0d6e6e,color:#0f172a,text-align:left
+    classDef box fill:#f4f4f3,stroke:#0b0b0b,color:#0b0b0b,text-align:left
     class cashier,manager,ml,admin actor
     class c,m,l,a,g box
     style actors fill:none,stroke:none
@@ -209,14 +209,14 @@ flowchart LR
 | UC02 | Đăng xuất | Mọi vai trò | Kết thúc phiên |
 | UC03 | Hồ sơ cá nhân | Mọi vai trò | Sửa thông tin, đổi mật khẩu; quản lý đặt PIN |
 | UC04 | Mở / đóng ca | Thu ngân | Chọn quầy, nhập tiền đầu ca; đóng ca có đối soát |
-| UC05 | Thanh toán — Kiểm tra chéo | Thu ngân | Quét mã từng món rồi kiểm tra khay trước khi thanh toán |
+| UC05 | Thanh toán — Kiểm tra chéo | Thu ngân | Camera chụp khay lúc khách đặt hàng; quét mã từng món; đối chiếu khi bấm Thanh toán |
 | UC06 | Thanh toán — Làn nhanh | Thu ngân | Camera nhận diện cả khay, thu ngân quét món không chắc |
 | UC07 | Đối chiếu khay | Hệ thống | So danh sách quét với kết quả nhận diện, sinh cảnh báo |
 | UC08 | Xử lý cảnh báo | Thu ngân | Quét bổ sung, hoặc tự xác nhận báo nhầm kèm lý do |
 | UC09 | Hoàn tất thanh toán | Thu ngân | Chọn phương thức, xuất hóa đơn |
-| UC10 | Xóa dòng / hủy giao dịch | Thu ngân | Cần quản lý xác nhận |
+| UC10 | Xóa dòng / hủy giao dịch | Thu ngân | Xóa dòng tự làm, chọn lý do; hủy giao dịch cần quản lý xác nhận |
 | UC11 | Xem lịch sử ca | Thu ngân | Giao dịch trong ca của mình |
-| UC12 | Xác nhận bằng PIN | Quản lý | Xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay |
+| UC12 | Xác nhận bằng PIN | Quản lý | Hủy giao dịch, bỏ qua kiểm tra khay |
 | UC13 | Xem dashboard | Quản lý | Doanh thu, cảnh báo, thất thoát ngăn được, độ phủ SKU |
 | UC14 | Hậu kiểm cảnh báo | Quản lý | Xem lại báo nhầm theo thứ tự ưu tiên, đánh giá đúng/sai/gian lận |
 | UC15 | Quản lý danh mục SKU | Quản lý | Thêm, sửa giá, ngừng bán; xem trạng thái nhận diện |
@@ -238,10 +238,11 @@ flowchart LR
 
 ### UC05 — Thanh toán, chế độ Kiểm tra chéo
 - **Tiền điều kiện:** đã mở ca; có model đang chạy.
-- **Luồng chính:** quét mã từng món → bấm **Kiểm tra khay** → hệ thống chụp và đối chiếu (UC07) → không có cảnh báo Cao thì mở **Thanh toán** (UC09).
+- **Luồng chính:** khách đặt hàng lên quầy → camera **tự chụp khay** → thu ngân quét mã từng món và cho vào túi như thường → bấm **Thanh toán** → hệ thống đối chiếu ảnh lúc đầu với danh sách đã quét (UC07) → không có cảnh báo Cao thì mở hộp thoại thanh toán (UC09).
+- **Vì sao chụp lúc đặt hàng:** thu ngân quét món nào cho vào túi món đó, đến lúc quét xong thì khay đã trống. Chụp lúc đầu thấy đủ hàng mà thu ngân không phải bấm thêm nút nào.
 - **Rẽ nhánh:**
-  - Có cảnh báo Cao → khóa thanh toán → UC08.
-  - Camera lỗi → thử lại; sau 2 lần, quản lý có thể cho bỏ qua (UC12), giao dịch ghi "không kiểm tra".
+  - Có cảnh báo Cao → khóa thanh toán → UC08 → bấm Thanh toán lại.
+  - Camera lỗi → **Chụp lại khay**; sau 2 lần, quản lý có thể cho bỏ qua (UC12), giao dịch ghi "không kiểm tra".
   - Mã không có trong danh mục → báo lỗi, không thêm dòng.
 
 ### UC06 — Thanh toán, chế độ Làn nhanh
@@ -253,18 +254,18 @@ flowchart LR
 Nếu thu ngân quét mã khác với SKU model đoán, hệ thống ghi một **bản sửa** để giám sát model.
 
 ### UC07 — Đối chiếu khay
-Đầu vào: số lượng đã quét theo SKU, kết quả nhận diện, danh sách SKU đã học, ngưỡng.
+Đầu vào: số lượng đã quét theo SKU, kết quả nhận diện của ảnh lúc khách đặt hàng, các dòng đã xóa vì khách không lấy nữa, danh sách SKU đã học, ngưỡng.
 
-1. Chỉ đếm nhận diện có độ tin ≥ ngưỡng cảnh báo → số lượng camera thấy.
+1. Chỉ đếm nhận diện có độ tin ≥ ngưỡng cảnh báo → số lượng camera thấy. Trừ đi số món khách đã trả lại sau khi chụp (BR-05).
 2. Với từng SKU **đã học**: so số camera thấy với số đã quét.
 3. Một SKU **thừa** và một SKU **thiếu** cùng nhóm hàng → **Nghi tráo mã**. Mức Cao nếu món camera thấy đắt hơn, ngược lại mức Trung bình.
 4. Có bao nhiêu món **hàng mới chưa học** đã quét thì bỏ qua bấy nhiêu món thừa (model có thể đoán hàng mới thành hàng cũ).
 5. Món thừa còn lại → **Món chưa quét**, mức Cao.
-6. Món thiếu còn lại → **Quét nhưng không thấy**, mức Thấp (có thể đã cho vào túi).
+6. Món thiếu còn lại → **Quét nhưng không thấy**, mức Thấp (có thể bị che trong ảnh).
 7. Nhận diện có độ tin giữa ngưỡng thấp và ngưỡng cảnh báo → chỉ vẽ khung nét đứt, không cảnh báo.
 
 ### UC08 — Xử lý cảnh báo
-Chọn cảnh báo → ảnh làm nổi vùng liên quan → **Quét bổ sung** → đối chiếu chạy lại, cảnh báo tự đóng.
+Chọn cảnh báo → ảnh làm nổi vùng liên quan → **Quét bổ sung** → đối chiếu chạy lại, cảnh báo tự đóng → bấm Thanh toán lại.
 
 Nếu camera sai → **Camera báo nhầm** → chọn lý do → cảnh báo đóng ngay, không phải chờ ai. Hệ thống lưu ảnh khay, lý do, người và thời gian; quản lý hậu kiểm sau (UC14, BR-17).
 
@@ -272,8 +273,18 @@ Vì sao không cần PIN: model sai không phải lỗi thu ngân. Nếu mỗi l
 
 Cảnh báo mức Thấp được bỏ qua.
 
+### UC10 — Xóa dòng / hủy giao dịch
+Khách đổi ý hoặc quét nhầm → thu ngân bấm xóa dòng → chọn lý do (khách không lấy nữa, quét nhầm mã, quét trùng) → dòng bị xóa ngay, không chờ quản lý, không phải chụp lại.
+
+- **Khách không lấy nữa:** món có trong ảnh lúc đặt hàng nhưng khách đã trả lại, nên khi đối chiếu hệ thống trừ món đó khỏi ảnh. Không cảnh báo nhầm.
+- **Quét nhầm mã, quét trùng:** món vẫn ở chỗ khách. Nếu thu ngân xóa mà không quét lại đúng mã thì camera vẫn thấy món trong ảnh và báo **Món chưa quét** mức Cao (BR-03).
+
+Vì sao không cần PIN: kẽ hở duy nhất là ghi "khách không lấy nữa" nhưng vẫn đưa hàng cho khách. Mọi dòng xóa được lưu kèm lý do, người, thời gian, và thu ngân xóa nhiều bất thường bị gắn cờ hậu kiểm (BR-17).
+
+Hủy cả giao dịch vẫn cần PIN quản lý (UC12).
+
 ### UC12 — Xác nhận bằng PIN
-Dùng cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay. Quản lý chọn lý do, nhập PIN 6 số trên màn quầy. Hệ thống ghi người xác nhận, thời gian, lý do. Không chấp nhận PIN của chính người đang đứng quầy. Sai 3 lần thì khóa 5 phút.
+Dùng cho hủy giao dịch, bỏ qua kiểm tra khay. Quản lý chọn lý do, nhập PIN 6 số trên màn quầy. Hệ thống ghi người xác nhận, thời gian, lý do. Không chấp nhận PIN của chính người đang đứng quầy. Sai 3 lần thì khóa nhập PIN ở quầy đó 5 phút.
 
 ### UC17 — Tạo ảnh ghép từ ảnh mẫu
 Ảnh ghép là nguồn dữ liệu **huấn luyện** chính: rẻ, nhiều, box có sẵn.
@@ -297,7 +308,7 @@ Dùng cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay. Quản lý ch
 ### UC21, UC22 — Duyệt và deploy model
 Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**. Trang phiên bản so sánh với bản đang chạy theo từng điều kiện cổng duyệt (BR-09).
 - **Deploy:** xác nhận lần hai; nếu có điều kiện không đạt thì bắt buộc ghi lý do. Sau deploy, SKU của đợt chuyển **Đã học**.
-- **Rollback:** quay về bản trước; SKU của đợt bị rollback quay về **Chưa học**.
+- **Rollback:** quay về bản trước; SKU của đợt bị rollback quay về **Đang học** (đợt về Chờ duyệt).
 
 ## 6. Quy tắc nghiệp vụ
 
@@ -307,7 +318,7 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | BR-02 | Camera chỉ kiểm tra / tự nhận SKU mà model đang chạy đã học; SKU khác bán bằng mã vạch |
 | BR-03 | Còn cảnh báo mức Cao thì không thanh toán được |
 | BR-04 | Thu ngân đóng cảnh báo Cao bằng quét bổ sung, hoặc tự xác nhận "camera báo nhầm" kèm lý do. Không cần PIN, không giới hạn số lần; hệ thống lưu ảnh khay, lý do, người và thời gian để hậu kiểm |
-| BR-05 | Xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay cần PIN quản lý |
+| BR-05 | Thu ngân tự xóa dòng, không cần PIN, chọn lý do. Lý do "khách không lấy nữa" thì món được trừ khỏi ảnh khi đối chiếu; lý do khác thì món vẫn tính là trên khay. Hủy giao dịch, bỏ qua kiểm tra khay cần PIN quản lý |
 | BR-06 | Mỗi giao dịch lưu: danh sách quét, giá lúc bán, ảnh khay, kết quả nhận diện, phiên bản model, cảnh báo và cách xử lý |
 | BR-07 | Chỉ một phiên bản model chạy tại một thời điểm |
 | BR-08 | Deploy phải qua cổng duyệt hoặc ghi lý do override; luôn rollback được về bản liền trước |
@@ -315,11 +326,11 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | BR-10 | Ngưỡng chỉnh theo nhóm đợt, chọn trên tập val, không chọn trên tập test |
 | BR-11 | Chỉ gửi huấn luyện khi: mỗi SKU mới có ≥ 8 ảnh cắt đã nhận (mặt trên, dưới, 4 cạnh, 2 góc nghiêng) · đã tạo ảnh ghép · tập kiểm tra ảnh thật ≥ 50 ảnh và mỗi SKU mới ≥ 20 box |
 | BR-12 | Box đề xuất của model chỉ thành nhãn khi được người chấp nhận. Ảnh thật chỉ lưu khi mọi món đều có box, kể cả hàng cũ: thiếu box thì model học món đó là nền |
-| BR-13 | Ảnh giao dịch giữ 30 ngày; ảnh đợt nhập (ảnh mẫu, ảnh thật) xóa sau khi deploy 14 ngày (cấu hình được) |
+| BR-13 | Ảnh giao dịch giữ 30 ngày; ảnh mẫu và ảnh thật dùng huấn luyện xóa sau khi deploy 14 ngày (cấu hình được). Tập kiểm tra ảnh thật được giữ lại vì cổng duyệt của các phiên bản sau còn đo mức quên trên đó |
 | BR-14 | Chỉ quản lý đổi giá và trạng thái bán; mã vạch không trùng |
 | BR-15 | Phân quyền kiểm tra ở backend; ẩn nút trên giao diện chỉ để tiện dùng |
 | BR-16 | Ảnh thật vào tập kiểm tra trước. Chỉ phần vượt mức BR-11 mới được trộn vào huấn luyện, và chỉ khi kỹ sư ML bật (thí nghiệm). Không để ảnh của cùng một giao dịch ở cả hai tập |
-| BR-17 | Hậu kiểm báo nhầm theo thứ tự ưu tiên: giá trị ≥ 30.000 ₫ · thu ngân bất thường (≥ 5 cảnh báo và tỉ lệ báo nhầm ≥ 1,5 lần mức chung của cửa hàng) · mẫu ngẫu nhiên 10% số còn lại. Báo nhầm lặp lại trên cùng cặp SKU ở nhiều thu ngân được coi là lỗi model → đưa vào hàng đợi ảnh khó |
+| BR-17 | Hậu kiểm báo nhầm theo thứ tự ưu tiên: giá trị ≥ 30.000 ₫ · thu ngân bất thường (≥ 5 cảnh báo và tỉ lệ báo nhầm ≥ 1,5 lần mức chung của cửa hàng) · mẫu ngẫu nhiên 10% số còn lại. Báo nhầm lặp lại trên cùng cặp SKU ở nhiều thu ngân được coi là lỗi model → đưa vào hàng đợi ảnh khó. Xóa dòng hậu kiểm cùng cách: thu ngân có ≥ 5 dòng xóa và số dòng xóa trên mỗi giao dịch ≥ 1,5 lần mức chung bị gắn cờ |
 
 ### Loại cảnh báo
 
@@ -336,7 +347,7 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 |---|---|
 | Giao dịch | Đang quét → (Chờ xử lý cảnh báo) → Sẵn sàng thanh toán → Đã thanh toán; hoặc Đã hủy |
 | Cảnh báo | Mở → Đã quét bổ sung / Thu ngân báo nhầm / Tự đóng → (Đã hậu kiểm) |
-| SKU | Chưa học → Đang học (thuộc đợt đang xử lý) → Đã học; rollback về Chưa học |
+| SKU | Chưa học → Đang học (thuộc đợt đang xử lý) → Đã học; rollback về Đang học |
 | Đợt nhập | Nháp → Thu thập dữ liệu (ảnh mẫu và ảnh thật song song) → Huấn luyện → Chờ duyệt → Đã deploy |
 | Job | Chờ → Đang chạy → Đang đánh giá → Xong / Lỗi |
 | Phiên bản model | Chờ duyệt → Đang chạy → Đã thay thế; hoặc Bị từ chối |
@@ -370,9 +381,9 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | US03 | Người dùng | sửa hồ sơ, đổi mật khẩu (quản lý: đặt PIN) | giữ tài khoản an toàn | UC03 |
 | US04 | Thu ngân | mở ca tại một quầy | giao dịch được ghi đúng quầy, đúng người | UC04 |
 | US05 | Thu ngân | quét mã và thấy giỏ cập nhật ngay | thao tác như POS quen thuộc | UC05 |
-| US06 | Thu ngân | hệ thống kiểm tra khay trước khi thanh toán | biết ngay món nào chưa quét hoặc quét sai | UC05, UC07 |
+| US06 | Thu ngân | camera tự chụp khay khi khách đặt hàng và đối chiếu khi tôi bấm Thanh toán | biết món nào chưa quét hoặc quét sai mà không phải bấm thêm nút | UC05, UC07 |
 | US07 | Thu ngân | xử lý cảnh báo bằng quét bổ sung, hoặc tự xác nhận "camera báo nhầm" kèm lý do | không phải chờ quản lý mỗi khi model sai | UC08 |
-| US08 | Quản lý | xác nhận bằng PIN tại quầy cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay | thao tác nhạy cảm luôn có người chịu trách nhiệm | UC12, UC10 |
+| US08 | Quản lý | xác nhận bằng PIN tại quầy cho hủy giao dịch, bỏ qua kiểm tra khay | thao tác nhạy cảm luôn có người chịu trách nhiệm | UC12, UC10 |
 | US09 | Thu ngân | camera đề xuất hóa đơn cho cả khay | phục vụ nhanh giờ cao điểm | UC06 |
 | US10 | Thu ngân | biết món nào cần quét xác nhận | không bỏ sót ở làn nhanh | UC06 |
 | US11 | Thu ngân | chọn phương thức thanh toán và xuất hóa đơn | kết thúc giao dịch | UC09 |
@@ -403,15 +414,15 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | US03 | Đổi mật khẩu cần mật khẩu cũ, mật khẩu mới ≥ 8 ký tự · PIN 6 số, không hiện lại sau khi lưu · Không tự đổi vai trò |
 | US04 | Mỗi quầy một ca mở · Màn quầy hiện trạng thái camera và phiên bản model |
 | US05 | Quét mã đúng → thêm dòng (trùng SKU thì tăng số lượng) · Mã sai / ngừng bán → báo lỗi · SKU chưa học có nhãn "Camera chưa nhận diện" |
-| US06 | Kết quả trong ≤ 3 giây (có GPU) · Đúng các cảnh báo theo UC07 · Không cảnh báo cho hàng mới chưa học đã quét · Box luôn có chữ, không chỉ dựa vào màu |
+| US06 | Camera tự chụp khi khách đặt hàng, thu ngân không bấm nút riêng · Bấm Thanh toán → đối chiếu; không có cảnh báo Cao thì mở hộp thoại thanh toán · Kết quả trong ≤ 3 giây (có GPU) · Đúng các cảnh báo theo UC07 · Không cảnh báo cho hàng mới chưa học đã quét · Box luôn có chữ, không chỉ dựa vào màu |
 | US07 | Bấm cảnh báo → ảnh làm nổi vùng liên quan · Quét đúng SKU → cảnh báo tự đóng · "Camera báo nhầm": chọn lý do, không cần PIN, không giới hạn số lần, hộp thoại báo rõ sẽ được lưu để hậu kiểm · Không có nút "Bỏ qua" cho cảnh báo Cao |
-| US08 | Hộp thoại nêu rõ việc cần xác nhận · PIN đúng + lý do → ghi người và thời gian · Sai 3 lần → khóa 5 phút · Từ chối PIN của người đang đứng quầy |
+| US08 | Hộp thoại nêu rõ việc cần xác nhận · PIN đúng + lý do → ghi người và thời gian · Sai 3 lần → khóa nhập PIN ở quầy đó 5 phút · Từ chối PIN của người đang đứng quầy |
 | US09 | Món đã học có độ tin ≥ ngưỡng tự nhận vào giỏ với nguồn "Camera" · Món không chắc hiện màu cam, có số thứ tự |
 | US10 | Còn món cam thì không thanh toán · Quét mã khác SKU dự đoán → ghi bản sửa · Phải tích "đã quét hết món ngoài vùng" trước khi thanh toán |
 | US11 | Tiền mặt: tính tiền thối, không xác nhận khi chưa đủ tiền · Sau thanh toán giao dịch không sửa được |
 | US12 | Xem giao dịch trong ca kèm ảnh và cảnh báo · Đóng ca hiện chênh lệch tiền mặt |
 | US13 | Lọc theo ngày, quầy · Có: doanh thu, giá trị món chưa quét đã phát hiện, tỉ lệ khay có cảnh báo, tỉ lệ báo nhầm, độ phủ SKU |
-| US14 | Lọc theo loại, mức, cách xử lý, thu ngân · Đánh dấu: Cảnh báo đúng / Báo nhầm thật / Nghi gian lận · Thống kê theo thu ngân · Mục "Cần hậu kiểm trước" xếp theo BR-17, ghi rõ vì sao · Bảng theo thu ngân có tỉ lệ báo nhầm và cờ "Bất thường" |
+| US14 | Lọc theo loại, mức, cách xử lý, thu ngân · Đánh dấu: Cảnh báo đúng / Báo nhầm thật / Nghi gian lận · Thống kê theo thu ngân · Mục "Cần hậu kiểm trước" xếp theo BR-17, ghi rõ vì sao · Bảng theo thu ngân có tỉ lệ báo nhầm, số dòng xóa trên mỗi giao dịch và cờ "Bất thường" |
 | US15 | Mã vạch không trùng, giá > 0 · SKU mới ở trạng thái Chưa học · Đổi giá không ảnh hưởng giao dịch cũ |
 | US16 | Đợt gồm các SKU Chưa học · Tiến trình 5 bước có thời gian |
 | US17 | Mỗi SKU mới: ảnh cắt kèm trạng thái Chờ duyệt / Cần xem kỹ / Nhận / Loại · Nút nhận hàng loạt ảnh rõ · Đếm ảnh đã nhận / mục tiêu · "Tạo ảnh ghép" chỉ bật khi mọi SKU đủ ảnh |
@@ -419,7 +430,7 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | US19 | Bảng theo SKU: ảnh mẫu đã nhận, box trong tập kiểm tra · Nút "Gửi huấn luyện" chỉ bật khi đạt BR-11 · Tùy chọn trộn ảnh thật vượt mức (BR-16), ghi vào log job |
 | US20 | Danh sách job: trạng thái, tiến độ, giờ GPU, thời gian · Xem log |
 | US21 | Bảng điều kiện BR-09: giá trị mới, giá trị bản đang chạy, Đạt / Không đạt |
-| US22 | Xác nhận lần hai; không đạt cổng thì bắt buộc ghi lý do · Sau deploy, SKU của đợt thành Đã học · Rollback đưa về Chưa học |
+| US22 | Xác nhận lần hai; không đạt cổng thì bắt buộc ghi lý do · Sau deploy, SKU của đợt thành Đã học · Rollback đưa về Đang học |
 | US23 | Kéo ngưỡng → thấy ngay bắt sót, báo nhầm, % tự nhận · Lưu tạo cấu hình mới, hoàn tác được |
 | US24 | Biểu đồ theo ngày: tỉ lệ cảnh báo, báo nhầm · Cặp SKU hay nhầm · Độ trễ · Bảng báo nhầm tại quầy theo SKU, đưa ảnh vào hàng đợi ảnh khó |
 | US25 | Email không trùng · Khóa/mở khóa · Không tự khóa chính mình |

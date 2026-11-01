@@ -20,7 +20,7 @@ export function JobsPage() {
               <tbody>{jobs.map((j) => (
                 <tr key={j.id} className="clickable" onClick={() => setOpenId(j.id)} style={j.id === openId ? { background: "var(--primary-soft)" } : undefined}>
                   <td className="mono">{j.id}</td><td>{j.type === "TRAIN" ? "Huấn luyện" : "Đánh giá"}</td><td>#{j.batch}</td><td><JobBadge status={j.status} /></td>
-                  <td><div className="row"><div style={{ flex: 1 }}><Progress value={(j.epoch / j.epochs) * 100} tone={j.status === "XONG" ? "ok" : ""} /></div><span className="small">{j.epoch}/{j.epochs}</span></div></td>
+                  <td><div className="row"><div style={{ flex: 1 }}><Progress value={(j.epoch / j.epochs) * 100} tone={j.status === "SUCCEEDED" ? "ok" : ""} /></div><span className="small">{j.epoch}/{j.epochs}</span></div></td>
                   <td className="num">{j.gpuHours.toFixed(2)}</td><td>{dateTime(j.startedAt)}</td><td>{j.finishedAt ? dateTime(j.finishedAt) : "—"}</td>
                 </tr>
               ))}</tbody>
@@ -31,12 +31,12 @@ export function JobsPage() {
           {open ? (
             <div className="col" style={{ gap: 10 }}>
               <div className="row"><JobBadge status={open.status} /><span className="spacer" /><span className="small muted">Đợt {open.batch} · 16 epoch · ConvNeXt-V2-Base + PDP</span></div>
-              <pre className="mono" style={{ background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 8, maxHeight: 320, overflow: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
+              <pre className="mono" style={{ background: "#141413", color: "#d6d6d2", padding: 12, borderRadius: 8, maxHeight: 320, overflow: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
                 {open.log.join("\n")}
               </pre>
               <div className="row">
-                <button className="btn sm" disabled={open.status === "XONG" || open.status === "LOI"} onClick={() => toast("Prototype: hủy job chưa được mô phỏng.")}>Hủy job</button>
-                <button className="btn sm" disabled={open.status !== "LOI"}>Chạy lại</button>
+                <button className="btn sm" disabled={open.status === "SUCCEEDED" || open.status === "FAILED"} onClick={() => toast("Prototype: hủy job chưa được mô phỏng.")}>Hủy job</button>
+                <button className="btn sm" disabled={open.status !== "FAILED"}>Chạy lại</button>
               </div>
             </div>
           ) : <Empty title="Chọn một job" />}

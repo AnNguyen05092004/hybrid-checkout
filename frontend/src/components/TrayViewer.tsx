@@ -18,7 +18,7 @@ const COLOR: Record<BoxKind, string> = {
   auto: "var(--box-match)",
   alert: "var(--box-alert)",
   review: "var(--box-review)",
-  uncertain: "#94a3b8",
+  uncertain: "#a3a39e",
   proposal: "var(--box-proposal)",
   drawn: "var(--box-drawn)",
 };
@@ -42,7 +42,7 @@ export function TrayViewer({ src, boxes, selected, onSelect, focus, showLabels =
   const [draft, setDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
 
   if (!src) {
-    return <div className="tray" style={{ aspectRatio: "1 / 1", display: "grid", placeItems: "center", color: "#cbd5e1" }}>{placeholder}</div>;
+    return <div className="tray tray-empty">{placeholder}</div>;
   }
 
   const point = (e: PointerEvent) => {

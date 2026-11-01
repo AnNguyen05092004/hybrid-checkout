@@ -14,14 +14,14 @@ export function SamplesPage() {
   const navigate = useNavigate();
   const b = batches.find((x) => x.id === Number(id));
   const items = skus.filter((s) => s.task === b?.id && cutoutsOf(s.id).length > 0);
-  const accepted = (skuId: number) => cutoutsOf(skuId).filter((c) => cutoutState[c.id] === "accepted").length;
+  const accepted = (skuId: number) => cutoutsOf(skuId).filter((c) => cutoutState[c.id] === "ACCEPTED").length;
   const [current, setCurrent] = useState(items.find((s) => accepted(s.id) < MIN_CUTOUTS)?.id ?? items[0]?.id);
 
   if (!b || items.length === 0) {
     return <Card><Empty title="Đợt này không có ảnh mẫu trong bản demo"><Link to={`/batches/${id}`}>Về chi tiết đợt</Link></Empty></Card>;
   }
 
-  const editable = b.status === "THU_THAP";
+  const editable = b.status === "COLLECTING";
   const isML = user?.role === "ML_ENGINEER";
   const done = items.filter((s) => accepted(s.id) >= MIN_CUTOUTS).length;
   const ready = done === items.length;
@@ -56,7 +56,7 @@ export function SamplesPage() {
         <Card title={sku.name} actions={editable && <div className="row">
           <button className="btn sm" onClick={() => toast("Prototype: ảnh mẫu đã có sẵn, không tải ảnh mới.")}><ImagePlus size={14} /> Tải ảnh mẫu</button>
           {isML && <button className="btn sm" disabled={pending.length === 0}
-            onClick={() => setCutoutState(pending.filter((c) => c.quality >= CUTOUT_REVIEW_BELOW).map((c) => c.id), "accepted")}>
+            onClick={() => setCutoutState(pending.filter((c) => c.quality >= CUTOUT_REVIEW_BELOW).map((c) => c.id), "ACCEPTED")}>
             <CheckCheck size={14} /> Nhận ảnh rõ</button>}
         </div>}>
           <div className="col" style={{ gap: 12 }}>
@@ -68,12 +68,12 @@ export function SamplesPage() {
                   <figure key={c.id} className={`cutout ${state ?? ""}`}>
                     <img src={`/${c.file}`} alt={`${sku.name}, ảnh cắt ${c.id}`} loading="lazy" />
                     <figcaption className="row small">
-                      {state === "accepted" ? <Badge tone="ok">Nhận</Badge> : state === "rejected" ? <Badge tone="danger">Loại</Badge>
+                      {state === "ACCEPTED" ? <Badge tone="ok">Nhận</Badge> : state === "REJECTED" ? <Badge tone="danger">Loại</Badge>
                         : c.quality < CUTOUT_REVIEW_BELOW ? <Badge tone="warn">Cần xem kỹ</Badge> : <Badge>Chờ duyệt</Badge>}
                       <span className="spacer" />
                       {isML && editable && <>
-                        <button className="btn sm ghost" aria-label="Nhận" onClick={() => setCutoutState([c.id], "accepted")}><Check size={14} /></button>
-                        <button className="btn sm ghost" aria-label="Loại" onClick={() => setCutoutState([c.id], "rejected")}><X size={14} /></button>
+                        <button className="btn sm ghost" aria-label="Nhận" onClick={() => setCutoutState([c.id], "ACCEPTED")}><Check size={14} /></button>
+                        <button className="btn sm ghost" aria-label="Loại" onClick={() => setCutoutState([c.id], "REJECTED")}><X size={14} /></button>
                       </>}
                     </figcaption>
                   </figure>
@@ -87,10 +87,10 @@ export function SamplesPage() {
           <Card title="Ảnh ghép">
             <div className="col" style={{ gap: 10 }}>
               <p className="small muted">Dán ảnh cắt đã nhận lên nền khay theo bố cục giống quầy thật. Box có sẵn khi ghép, không cần vẽ.</p>
-              {composites.status === "DONE" && <div className="row"><span className="muted small">Đã tạo</span><span className="spacer" /><b>{composites.count.toLocaleString("vi-VN")} ảnh</b></div>}
+              {composites.status === "SUCCEEDED" && <div className="row"><span className="muted small">Đã tạo</span><span className="spacer" /><b>{composites.count.toLocaleString("vi-VN")} ảnh</b></div>}
               {isML && editable && (
                 <button className="btn primary" disabled={!ready || composites.status === "RUNNING"} onClick={() => generateComposites(b.id)}>
-                  {composites.status === "RUNNING" ? <><Loader2 size={16} className="spin" /> Đang tạo…</> : <><Layers size={16} /> {composites.status === "DONE" ? "Tạo lại ảnh ghép" : "Tạo ảnh ghép"}</>}
+                  {composites.status === "RUNNING" ? <><Loader2 size={16} className="spin" /> Đang tạo…</> : <><Layers size={16} /> {composites.status === "SUCCEEDED" ? "Tạo lại ảnh ghép" : "Tạo ảnh ghép"}</>}
                 </button>
               )}
               {!ready && <span className="small" style={{ color: "var(--warn)" }}>Cần mọi SKU có ≥ {MIN_CUTOUTS} ảnh cắt đã nhận.</span>}

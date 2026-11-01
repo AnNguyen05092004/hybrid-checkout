@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "../../app/store";
 import { reconcile, type Detection, type TrayAlert } from "../../lib/reconcile";
 import { sku } from "../../mocks/catalog";
-import type { AlertRecord, TxLine } from "../../mocks/seed";
+import type { AlertRecord, RemovedLine, TxLine } from "../../mocks/seed";
 import { TRAYS, detect } from "../../mocks/trays";
 
 export type Mode = "VERIFY" | "FAST";
@@ -18,6 +18,9 @@ export interface Dismissal {
   reason: string;
 }
 
+/** Removal reason meaning the item left the tray after the photo (BR-05). */
+export const CUSTOMER_DECLINED = "Khách không lấy nữa";
+
 /**
  * State and rules of one checkout at the counter (UC05, UC06, UC07, UC08).
  * The page only renders what this hook returns.
@@ -29,6 +32,9 @@ export function useCheckout() {
   const [mode, setModeState] = useState<Mode>("VERIFY");
   const [trayId, setTrayId] = useState(TRAYS[0].id);
   const [lines, setLines] = useState<TxLine[]>([]);
+  const [removed, setRemoved] = useState<RemovedLine[]>([]);
+  // Cross-check: the photo is taken when the customer puts the items down, compared when the cashier presses Pay.
+  const [checked, setChecked] = useState(false);
   const [scanError, setScanError] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [failures, setFailures] = useState(0);
@@ -58,13 +64,19 @@ export function useCheckout() {
     ...reviews.filter((r) => r.resolved !== null && isLearned(r.resolved)).map((r) => ({ ...r.det, skuId: r.resolved!, score: 1 })),
   ]), [mode, detections, reviews, activeBatch, thresholds]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reconciliation is derived: it re-runs on every scan once the tray has been checked.
-  const ready = phase === "done" && (mode === "VERIFY" || outsideDone);
+  const returned = useMemo(() => {
+    const m = new Map<number, number>();
+    removed.filter((r) => r.reason === CUSTOMER_DECLINED).forEach((r) => m.set(r.skuId, (m.get(r.skuId) ?? 0) + r.qty));
+    return m;
+  }, [removed]);
+
+  // Reconciliation is derived: once compared, it re-runs on every scan and every deleted line.
+  const ready = phase === "done" && (mode === "VERIFY" ? checked : outsideDone);
   const result = useMemo(() => (!ready ? null : reconcile({
-    scanned, detections: reconciled, isLearned,
+    scanned, detections: reconciled, isLearned, returned,
     categoryOf: (id) => sku(id).category, priceOf: (id) => sku(id).price,
     alertThreshold: (id) => th(id).alert, lowThreshold: low,
-  })), [ready, scanned, reconciled]); // eslint-disable-line react-hooks/exhaustive-deps
+  })), [ready, scanned, reconciled, returned]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Remember every alert raised during the checkout, so the transaction records how each was closed.
   useEffect(() => {
@@ -79,18 +91,23 @@ export function useCheckout() {
   const total = lines.reduce((s, l) => s + l.qty * l.price, 0);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
 
-  /** Why payment is locked, or "" when the cashier may pay (BR-03). */
+  /**
+   * Why payment is locked, or "" when the cashier may press Pay (BR-03). In the cross-check, pressing Pay
+   * runs the comparison first; the payment dialog opens only if no HIGH alert comes out of it.
+   */
   const payBlocker =
     lines.length === 0 ? "Giỏ hàng trống." :
     skipped ? "" :
-    phase !== "done" ? (mode === "VERIFY" ? "Bấm Kiểm tra khay trước khi thanh toán." : "Bấm Nhận diện khay trước.") :
+    phase === "loading" ? "Camera đang chụp khay…" :
+    phase !== "done" ? (mode === "VERIFY" ? "Chưa có ảnh khay: chụp lại khay." : "Bấm Nhận diện khay trước.") :
     mode === "FAST" && pendingReviews.length ? `Còn ${pendingReviews.length} món cần quét xác nhận.` :
     mode === "FAST" && !outsideDone ? "Xác nhận đã quét hết món ngoài vùng nhận diện." :
     blocking.length ? `Còn ${blocking.length} cảnh báo mức Cao chưa xử lý.` : "";
 
   /** Current step of the 3-step bar (0, 1 or 2). */
-  const step = phase !== "done" && !skipped ? (mode === "VERIFY" && lines.length === 0 ? 0 : mode === "VERIFY" ? 1 : 0)
-    : payBlocker ? 1 : 2;
+  const step = mode === "VERIFY"
+    ? (skipped ? 2 : !checked ? 0 : payBlocker ? 1 : 2)
+    : (phase !== "done" && !skipped ? 0 : payBlocker ? 1 : 2);
 
   const addLine = (skuId: number, source: TxLine["source"]) =>
     setLines((ls) => {
@@ -104,6 +121,8 @@ export function useCheckout() {
     if (!s) return setScanError(`Mã ${barcode} không có trong danh mục.`);
     if (!s.selling) return setScanError(`${s.name} đang ngừng bán.`);
     setScanError("");
+    // The items are on the counter once scanning starts: the camera has taken its photo by now.
+    if (mode === "VERIFY" && phase === "idle") capture();
     if (mode === "FAST" && phase === "done") {
       const target = reviews.find((r) => r.det.id === selectedReview && r.resolved === null)
         ?? reviews.find((r) => r.resolved === null && r.det.skuId === s.id);
@@ -134,7 +153,7 @@ export function useCheckout() {
   };
 
   const reset = () => {
-    setLines([]); setPhase("idle"); setFailures(0); setSkipped(false); setDismissed({}); setRaised({});
+    setLines([]); setRemoved([]); setChecked(false); setPhase("idle"); setFailures(0); setSkipped(false); setDismissed({}); setRaised({});
     setReviews([]); setSelectedReview(null); setOutsideDone(false); setCorrections(0); setScanError("");
   };
 
@@ -149,30 +168,38 @@ export function useCheckout() {
   };
 
   const dismiss = (alertId: string, d: Dismissal) => setDismissed((x) => ({ ...x, [alertId]: d }));
-  const removeLine = (line: TxLine) => setLines((ls) => ls.filter((l) => l !== line));
+  const removeLine = (line: TxLine, reason: string) => {
+    setLines((ls) => ls.filter((l) => l !== line));
+    setRemoved((rs) => [...rs, { ...line, reason }]);
+  };
+
+  /** Cross-check: compare the photo with the scanned list (pressing Pay). */
+  const check = () => setChecked(true);
 
   /** Save the paid transaction and return its id. */
   const pay = (method: "CASH" | "CARD" | "TRANSFER") => {
     const id = `GD${Date.now().toString().slice(-6)}`;
+    // Alerts still open at payment are non-blocking ones (BR-03): they close by themselves.
+    const open = new Set(openAlerts.map((a) => a.id));
     const alerts: AlertRecord[] = Object.values(raised).map((a) => {
       const d = dismissed[a.id];
-      if (a.severity === "LOW") return { ...a, resolution: "TU_DONG", reason: d?.reason };
-      if (d) return { ...a, resolution: "BAO_NHAM", reason: d.reason };
-      return { ...a, resolution: "DA_QUET_BO_SUNG" };
+      if (a.severity === "LOW") return { ...a, resolution: "AUTO_CLOSED", reason: d?.reason };
+      if (d) return { ...a, resolution: "FALSE_ALARM", reason: d.reason };
+      return { ...a, resolution: open.has(a.id) ? "AUTO_CLOSED" : "SCANNED" };
     });
     addTransaction({
       id, at: new Date().toISOString(), counterId: counter.id, cashier: user!.name, mode, trayId,
-      modelVersion: `v${activeBatch}`, lines, alerts, status: "DA_THANH_TOAN", payment: method, total, corrections,
+      modelVersion: `v${activeBatch}`, lines, removed, alerts, status: "PAID", payment: method, total, corrections,
     });
     return id;
   };
 
   return {
     counter, mode, setMode, tray, trayId, setTrayId, nextTray, detections, lines, scanned, scanError,
-    phase, failures, skipped, setSkipped, result, openAlerts, blocking, raised, dismissed, dismiss,
+    phase, checked, failures, skipped, setSkipped, result, openAlerts, blocking, raised, dismissed, dismiss,
     reviews, pendingReviews, selectedReview, setSelectedReview, outsideDone, setOutsideDone,
     total, itemCount, payBlocker, step, isAuto, isLearned,
-    scan, capture, reset, removeLine, pay,
+    scan, capture, check, reset, removeLine, pay,
   };
 }
 

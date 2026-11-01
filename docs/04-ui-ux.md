@@ -29,12 +29,15 @@ Tham khảo: hướng dẫn thiết kế POS (màn ít rối, nút lớn, bướ
 
 Định nghĩa bằng biến CSS trong [global.css](../frontend/src/styles/global.css).
 
+Phong cách đơn sắc: đen cho thao tác chính và khung, xám cho cấu trúc, màu chỉ dùng khi mang nghĩa (đạt, cần chú ý, cảnh báo, loại box). Thẻ dùng viền mảnh thay bóng đổ.
+
 | Token | Giá trị | Dùng cho |
 |---|---|---|
-| `--primary` | `#0d6e6e` | Nút chính, mục đang chọn |
-| `--ok` / `--warn` / `--danger` / `--info` | `#15803d` / `#b45309` / `#b91c1c` / `#1d4ed8` | Đạt, Đã học · Cần chú ý · Cảnh báo Cao, lỗi · Ghi chú prototype |
-| `--text` / `--text-2` / `--text-3` | `#0f172a` / `#475569` / `#94a3b8` | Chữ chính / phụ / mờ |
-| Nền khung | `#0b2b2b` | Sidebar, thanh quầy |
+| `--primary` | `#0b0b0b` | Nút chính, mục đang chọn, bước hiện tại |
+| `--bg` / `--surface` / `--border` | `#f4f4f3` / `#ffffff` / `#e6e6e4` | Nền trang / thẻ / viền |
+| `--text` / `--text-2` / `--text-3` | `#0b0b0b` / `#55554f` / `#8b8b85` | Chữ chính / phụ / mờ |
+| `--ok` / `--warn` / `--danger` / `--info` | `#15803d` / `#a35a00` / `#c0261d` / `#1e48c2` | Đạt, Đã học · Cần chú ý · Cảnh báo Cao, lỗi · Trạng thái thông tin |
+| `--ink` | `#0b0b0b` | Sidebar, thanh quầy, nền trang đăng nhập |
 
 | Box trên ảnh | Màu | Kiểu |
 |---|---|---|
@@ -45,11 +48,11 @@ Tham khảo: hướng dẫn thiết kế POS (màn ít rối, nút lớn, bướ
 | Đề xuất của model khi gán nhãn | Xanh dương | Nét đứt (chờ), liền (đã chấp nhận) |
 | Box người vẽ | Tím | Viền liền |
 
-Font **Be Vietnam Pro** (dấu tiếng Việt rõ); số tiền dùng `tabular-nums` cho thẳng cột.
+Font **Geist** cho chữ (có dấu tiếng Việt), **Geist Mono** cho mã vạch, mã giao dịch, tiêu đề cột và nhãn nhỏ viết hoa. Số tiền và chỉ số dùng `tabular-nums` cho thẳng cột. Thứ chỉ có trong prototype (dữ liệu giả lập, bộ mô phỏng thiết bị, tài khoản demo) có nhãn đen **PROTOTYPE** và khung nét đứt.
 
 ## 4. Luồng chính
 
-**Kiểm tra chéo:** Quét mã → Kiểm tra khay → (có cảnh báo: Quét bổ sung, hoặc Camera báo nhầm) → Thanh toán.
+**Kiểm tra chéo:** Khách đặt hàng (camera tự chụp) → Quét mã, cho vào túi → bấm Thanh toán = đối chiếu → (có cảnh báo: Quét bổ sung, hoặc Camera báo nhầm, rồi bấm lại) → Thanh toán. Thu ngân không có nút "kiểm tra khay" nào phải nhớ bấm.
 
 **Làn nhanh:** Nhận diện khay → món xanh tự vào giỏ → quét món cam và món không có khung → tích "đã quét hết" → Thanh toán.
 
@@ -58,7 +61,7 @@ Font **Be Vietnam Pro** (dấu tiếng Việt rõ); số tiền dùng `tabular-n
 ## 5. Màn hình
 
 ### Quầy — Kiểm tra chéo
-Khay 5 món, quét sót 1 thanh sô-cô-la. Thanh bước đang ở "Kiểm tra khay"; ảnh đóng khung đỏ đúng món đó; dòng dưới tổng tiền nói vì sao chưa thanh toán được.
+Khay 5 món, quét sót 1 thanh sô-cô-la. Thu ngân bấm Thanh toán, thanh bước chuyển sang "Đối chiếu khay"; ảnh chụp lúc khách đặt hàng đóng khung đỏ đúng món đó; dòng dưới tổng tiền nói vì sao chưa thanh toán được.
 
 ![Kiểm tra chéo](images/ui/04-pos-verify-alert.png)
 
@@ -70,7 +73,11 @@ Camera sai: thu ngân bấm **Camera báo nhầm**, chọn lý do và đi tiếp
 
 ![Camera báo nhầm](images/ui/08a-false-alarm.png)
 
-PIN quản lý chỉ dùng cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra khay.
+Xóa dòng: thu ngân tự xóa, chọn lý do, không chờ quản lý, không phải chụp lại. Hộp thoại nói rõ: "khách không lấy nữa" thì món được trừ khỏi ảnh khi đối chiếu; lý do khác thì món vẫn tính là trên khay, nhớ quét đúng mã.
+
+![Xóa dòng](images/ui/08b-remove-line.png)
+
+PIN quản lý chỉ dùng cho hủy giao dịch, bỏ qua kiểm tra khay.
 
 ![PIN quản lý](images/ui/08-manager-pin.png)
 
@@ -89,6 +96,10 @@ Món chắc chắn tự vào giỏ (nguồn **Camera**); món không chắc có 
 Hậu kiểm: báo nhầm đáng ngờ (giá trị cao, thu ngân có tỉ lệ báo nhầm bất thường) nằm trên cùng, kèm lý do vì sao cần xem trước.
 
 ![Cảnh báo](images/ui/20-alerts.png)
+
+Bảng theo thu ngân so cả báo nhầm lẫn số dòng xóa trên mỗi giao dịch với mức chung của cửa hàng.
+
+![Báo nhầm và xóa dòng theo thu ngân](images/ui/20b-alerts-cashiers.png)
 
 ![Chi tiết giao dịch](images/ui/21-transaction.png)
 ![Danh mục SKU](images/ui/22-skus.png)
@@ -156,8 +167,8 @@ Giới hạn:
 ## 9. Kịch bản demo (khoảng 7 phút)
 
 1. **Thu ngân** → **Mở ca** ở Quầy 1.
-2. **Kiểm tra chéo:** trong khung "Mô phỏng thiết bị" (thay cho khay thật và máy quét), bấm **Quét** cho mọi món trừ một món → **Kiểm tra khay** → cảnh báo đỏ "Món chưa quét", nút Thanh toán bị khóa → bấm **Quét** món còn thiếu → cảnh báo tự đóng → **Thanh toán**.
-3. **Báo nhầm và PIN:** ở giao dịch mới, bấm **Tráo** ở một món (quét mã một món rẻ hơn cùng nhóm), quét các món còn lại → **Kiểm tra khay** → cảnh báo "Nghi tráo mã". Giả sử camera sai: **Camera báo nhầm** → chọn lý do → thanh toán được ngay. Bấm thùng rác ở một dòng giỏ hàng để xem hộp thoại PIN quản lý.
+2. **Kiểm tra chéo:** trong khung "Mô phỏng thiết bị" (thay cho khay thật và máy quét), bấm **Khách đặt khay lên quầy** (camera tự chụp; ở quầy thật việc này tự động) → bấm **Quét** cho mọi món trừ một món → **Thanh toán** → hệ thống đối chiếu, báo đỏ "Món chưa quét", nút Thanh toán bị khóa → bấm **Quét** món còn thiếu → cảnh báo tự đóng → **Thanh toán**.
+3. **Báo nhầm, xóa dòng và PIN:** ở giao dịch mới, bấm **Tráo** ở một món (quét mã một món rẻ hơn cùng nhóm), quét các món còn lại → **Thanh toán** → cảnh báo "Nghi tráo mã". Giả sử camera sai: **Camera báo nhầm** → chọn lý do → thanh toán được. Ở giao dịch khác, bấm thùng rác ở một dòng giỏ hàng: lý do "Khách không lấy nữa" thì đối chiếu trừ món đó khỏi ảnh, không cảnh báo; lý do "Quét nhầm mã" mà không quét lại thì camera báo "Món chưa quét". Bấm **Hủy giao dịch** để xem hộp thoại PIN quản lý.
 4. **Làn nhanh:** chọn tab **Làn nhanh** → chọn khay có ghi "có hàng mới" → **Nhận diện khay**. Món khung xanh tự vào giỏ. Món **khung cam có số thứ tự** là món camera chưa chắc chắn (thường là hàng mới model chưa học): quét từng món này → tích "đã quét hết món ngoài vùng" → **Thanh toán**.
 5. **Kỹ sư ML** → Đợt nhập → **Đợt 5** (lô hàng mới mà camera chưa nhận diện được). Cần chuẩn bị hai loại dữ liệu:
    - **Ảnh ghép, để huấn luyện:** **Mở ảnh mẫu** → với các SKU còn thiếu ảnh, nhận những ảnh sản phẩm đã cắt nền sạch → **Tạo ảnh ghép**. Box có sẵn khi ghép nên không phải vẽ.
@@ -166,7 +177,7 @@ Giới hạn:
    Đủ cả hai loại dữ liệu thì nút **Gửi huấn luyện** sáng lên.
 6. **Gửi huấn luyện** → đợi job chạy xong → **Phiên bản model** → **v5** → xem cổng duyệt → **Deploy**.
 7. **Thu ngân** → **Làn nhanh** → chọn lại khay ở bước 4: hàng mới giờ được camera tự nhận, không phải quét nữa.
-8. **Quản lý** → **Cảnh báo & Hậu kiểm**: mục "Cần hậu kiểm trước" liệt kê báo nhầm đáng ngờ kèm lý do; bảng theo thu ngân gắn cờ "Bất thường" cho một người.
+8. **Quản lý** → **Cảnh báo & Hậu kiểm**: mục "Cần hậu kiểm trước" liệt kê báo nhầm đáng ngờ kèm lý do; bảng theo thu ngân gắn cờ "Bất thường" cho một người, cả về báo nhầm lẫn xóa dòng.
 
 ## 10. Màn hình → mã nguồn
 

@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import type { Mode } from "../useCheckout";
 
 const STEPS: Record<Mode, string[]> = {
-  VERIFY: ["Quét mã từng món", "Kiểm tra khay", "Thanh toán"],
+  VERIFY: ["Quét mã từng món", "Đối chiếu khay", "Thanh toán"],
   FAST: ["Nhận diện khay", "Quét món cần xác nhận", "Thanh toán"],
 };
 

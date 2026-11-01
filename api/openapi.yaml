@@ -1,0 +1,3418 @@
+openapi: 3.1.0
+info:
+  title: HybridCheckout API
+  version: 1.0.0
+  summary: API của hệ thống thanh toán tại quầy kết hợp mã vạch và thị giác máy tính.
+  description: |
+    Contract của backend (design-first): backend FastAPI phải khớp file này, frontend sinh kiểu TypeScript từ file này.
+
+    - Tên path, field, enum bằng tiếng Anh, khớp `database/schema.dbml`. Mô tả bằng tiếng Việt.
+    - Tiền là số nguyên VND, field có hậu tố `_vnd`. Thời điểm theo ISO 8601 có múi giờ. Box chuẩn hóa về 0..1.
+    - Lỗi trả về `application/problem+json` (RFC 9457) với `code` ổn định để frontend rẽ nhánh.
+    - Phân quyền kiểm tra ở backend (BR-15). `x-roles` ghi vai trò được gọi thao tác.
+    - Mã quy tắc (BR-xx) và use case (UCxx) tham chiếu `docs/02-use-case-user-stories.md`.
+servers:
+  - url: /api/v1
+    description: Cùng origin với web app (nginx chuyển /api sang backend)
+  - url: http://localhost:8000/api/v1
+    description: Backend chạy local
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Đăng nhập, làm mới token, đăng xuất.
+  - name: Profile
+    description: Hồ sơ của người đang đăng nhập, đổi mật khẩu, PIN quản lý.
+  - name: Counters
+    description: Quầy và camera; thu ngân xem để chọn quầy, quản trị viên thêm và sửa.
+  - name: Shifts
+    description: Mở ca, tổng kết ca, đóng ca.
+  - name: Checkout
+    description: Giao dịch tại quầy — quét mã, chụp và đối chiếu khay, xóa dòng, thanh toán, hủy (UC05–UC12).
+  - name: Alerts
+    description: Cảnh báo đối chiếu, báo nhầm, hậu kiểm theo ưu tiên (UC08, UC14, BR-04, BR-17).
+  - name: Catalog
+    description: Nhóm hàng và danh mục SKU (UC15).
+  - name: Batches
+    description: Đợt nhập, ảnh mẫu, ảnh ghép, gửi huấn luyện (UC16, UC17, UC19).
+  - name: Labeling
+    description: Gán nhãn ảnh thật có trợ lý và hàng đợi ảnh khó (UC18).
+  - name: Jobs
+    description: Job chạy nền — ghép ảnh, huấn luyện, đánh giá (UC20).
+  - name: Models
+    description: Phiên bản model, cổng duyệt, deploy, rollback (UC21, UC22).
+  - name: Thresholds
+    description: Ngưỡng nhận diện theo đợt, xem trước tác động, lịch sử (UC23).
+  - name: Reports
+    description: Dashboard, thống kê theo thu ngân, giám sát model (UC13, UC24).
+  - name: Users
+    description: Quản trị người dùng (UC25).
+  - name: System
+    description: Nhật ký, cài đặt lưu trữ, health check (UC27, UC28).
+
+paths:
+  # ------------------------------------------------------------------ auth
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Đăng nhập
+      description: |
+        Trả access token (JWT, 15 phút) và đặt refresh token vào cookie `hc_refresh` (httpOnly, SameSite=Strict, 12 giờ — đủ một ca).
+        Sai email hoặc mật khẩu, hay tài khoản bị khóa đều trả cùng một lỗi (US01).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example: { email: thu.ngan@hybrid.vn, password: matkhau123 }
+      responses:
+        '200':
+          description: Đăng nhập thành công
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/RefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Làm mới access token
+      description: Đọc cookie `hc_refresh`, cấp access token mới và xoay vòng refresh token. Refresh token đã dùng hoặc đã thu hồi thì bị từ chối.
+      security:
+        - refreshCookie: []
+      responses:
+        '200':
+          description: Token mới
+          headers:
+            Set-Cookie: { $ref: '#/components/headers/RefreshCookie' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Đăng xuất
+      description: Thu hồi refresh token và xóa cookie. Access token còn hạn tự hết sau tối đa 15 phút.
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN]
+      responses:
+        '204': { description: Đã đăng xuất }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ------------------------------------------------------------------ profile
+  /me:
+    get:
+      tags: [Profile]
+      operationId: getMe
+      summary: Xem hồ sơ
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN]
+      responses:
+        '200':
+          description: Hồ sơ
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [Profile]
+      operationId: updateMe
+      summary: Sửa họ tên
+      description: Không tự đổi được vai trò hay trạng thái (US03).
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProfileUpdate' }
+      responses:
+        '200':
+          description: Hồ sơ sau khi sửa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /me/password:
+    put:
+      tags: [Profile]
+      operationId: changePassword
+      summary: Đổi mật khẩu
+      description: Cần mật khẩu cũ; mật khẩu mới ≥ 8 ký tự. Đổi xong thu hồi mọi refresh token khác của người này.
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordChange' }
+      responses:
+        '204': { description: Đã đổi }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /me/pin:
+    put:
+      tags: [Profile]
+      operationId: setManagerPin
+      summary: Đặt hoặc đổi PIN quản lý
+      description: PIN 6 số, chỉ lưu bản băm, không trả lại sau khi lưu. Hai quản lý không được trùng PIN (quầy so PIN với mọi quản lý).
+      x-roles: [STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PinSet' }
+      responses:
+        '204': { description: Đã lưu PIN }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ counters
+  /counters:
+    get:
+      tags: [Counters]
+      operationId: listCounters
+      summary: Danh sách quầy
+      description: Kèm trạng thái camera (online nếu có heartbeat trong 30 giây) và ca đang mở. Thu ngân dùng ở màn Mở ca (P01).
+      x-roles: [CASHIER, STORE_MANAGER, ADMIN]
+      parameters:
+        - { $ref: '#/components/parameters/IncludeInactive' }
+      responses:
+        '200':
+          description: Các quầy
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Counter' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Counters]
+      operationId: createCounter
+      summary: Thêm quầy
+      x-roles: [ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CounterCreate' }
+      responses:
+        '201':
+          description: Đã thêm
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counter' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /counters/{counterId}:
+    parameters:
+      - { $ref: '#/components/parameters/CounterId' }
+    patch:
+      tags: [Counters]
+      operationId: updateCounter
+      summary: Sửa quầy, gán camera, ngừng dùng
+      x-roles: [ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CounterUpdate' }
+      responses:
+        '200':
+          description: Quầy sau khi sửa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Counter' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /counters/{counterId}/test-capture:
+    parameters:
+      - { $ref: '#/components/parameters/CounterId' }
+    post:
+      tags: [Counters]
+      operationId: testCapture
+      summary: Chụp thử camera
+      description: Chụp một ảnh để kiểm tra kết nối (US26). Ảnh không gắn với giao dịch và tự xóa sau 1 giờ.
+      x-roles: [CASHIER, STORE_MANAGER, ADMIN]
+      responses:
+        '200':
+          description: Ảnh chụp thử
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TestCapture' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/CameraUnavailable' }
+
+  # ------------------------------------------------------------------ shifts
+  /shifts:
+    post:
+      tags: [Shifts]
+      operationId: openShift
+      summary: Mở ca
+      description: Mỗi quầy và mỗi thu ngân chỉ có một ca mở (US04). Quản lý mở ca cho chính mình khi đứng quầy.
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShiftOpen' }
+      responses:
+        '201':
+          description: Ca đã mở
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shift' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`SHIFT_ALREADY_OPEN` — quầy hoặc người này đã có ca mở; `COUNTER_INACTIVE`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /shifts/current:
+    get:
+      tags: [Shifts]
+      operationId: getCurrentShift
+      summary: Ca đang mở của tôi
+      description: Kèm giao dịch OPEN (nếu có) để màn quầy khôi phục giỏ hàng sau khi tải lại trang.
+      x-roles: [CASHIER, STORE_MANAGER]
+      responses:
+        '200':
+          description: Ca đang mở
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentShift' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`NO_OPEN_SHIFT` — chưa mở ca, frontend chuyển sang P01.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /shifts/{shiftId}/summary:
+    parameters:
+      - { $ref: '#/components/parameters/ShiftId' }
+    get:
+      tags: [Shifts]
+      operationId: getShiftSummary
+      summary: Tổng kết ca
+      description: Số giao dịch, doanh thu, tiền mặt dự kiến, cảnh báo theo cách xử lý (P06). Thu ngân chỉ xem ca của mình.
+      x-roles: [CASHIER, STORE_MANAGER]
+      responses:
+        '200':
+          description: Tổng kết
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShiftSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /shifts/{shiftId}/close:
+    parameters:
+      - { $ref: '#/components/parameters/ShiftId' }
+    post:
+      tags: [Shifts]
+      operationId: closeShift
+      summary: Đóng ca
+      description: Ghi tiền mặt thực đếm, trả chênh lệch so với dự kiến. Không đóng được khi còn giao dịch OPEN.
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShiftClose' }
+      responses:
+        '200':
+          description: Ca đã đóng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShiftSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`SHIFT_CLOSED`; `TRANSACTION_STILL_OPEN` — thanh toán hoặc hủy giao dịch đang mở trước.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ checkout
+  /transactions:
+    get:
+      tags: [Checkout]
+      operationId: listTransactions
+      summary: Danh sách giao dịch
+      description: Quản lý xem toàn cửa hàng (M04); thu ngân chỉ thấy ca của mình (P06), backend tự lọc theo người gọi.
+      x-roles: [CASHIER, STORE_MANAGER]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - { name: shift_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: counter_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: mode, in: query, schema: { $ref: '#/components/schemas/CheckoutMode' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/TransactionStatus' } }
+        - name: has_alerts
+          in: query
+          description: Chỉ giao dịch có cảnh báo mức Cao hoặc Trung bình
+          schema: { type: boolean }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang giao dịch, mới nhất trước
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TransactionPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Checkout]
+      operationId: createTransaction
+      summary: Bắt đầu giao dịch
+      description: Gọi ở lần quét đầu tiên hoặc khi bấm Nhận diện khay; gắn với ca đang mở của người gọi. Mỗi ca chỉ một giao dịch OPEN.
+      x-roles: [CASHIER, STORE_MANAGER]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionCreate' }
+      responses:
+        '201':
+          description: Giao dịch mới, trạng thái OPEN
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`NO_OPEN_SHIFT`; `TRANSACTION_ALREADY_OPEN` — `detail` chứa id giao dịch đang mở.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /transactions/{transactionId}:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    get:
+      tags: [Checkout]
+      operationId: getTransaction
+      summary: Xem giao dịch
+      description: |
+        Trạng thái đầy đủ cho màn quầy và màn Chi tiết giao dịch (M03): dòng, dòng đã xóa, lần chụp khay gần nhất kèm box,
+        cảnh báo, xác nhận của quản lý và `pay_blockers` (lý do nút Thanh toán đang khóa).
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Giao dịch
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Checkout]
+      operationId: changeCheckoutMode
+      summary: Đổi chế độ quầy
+      description: Chỉ đổi được khi giỏ trống và chưa chụp khay.
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransactionUpdate' }
+      responses:
+        '200':
+          description: Giao dịch sau khi đổi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`MODE_LOCKED` — giỏ đã có hàng; `TRANSACTION_NOT_OPEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/lines:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: scanItem
+      summary: Quét mã một món
+      description: |
+        Thêm dòng theo mã vạch; cùng SKU thì tăng số lượng (US05). Giá lấy tại thời điểm quét (BR-06).
+
+        - Làn nhanh: gửi `detection_id` khi quét để xác nhận một box màu cam. Mã khác SKU model đoán thì box được ghi là bản sửa (US10).
+        - Nếu đã đối chiếu, đối chiếu chạy lại trên ảnh khay: cảnh báo không còn đúng sẽ tự đóng với `SCANNED` (UC08).
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScanRequest' }
+            example: { barcode: '2000000000015', qty: 1 }
+      responses:
+        '200':
+          description: Giao dịch sau khi quét
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TRANSACTION_NOT_OPEN`; `DETECTION_ALREADY_CONFIRMED`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422':
+          description: '`BARCODE_NOT_FOUND`; `SKU_NOT_SELLING`; `VALIDATION_ERROR`. Không thêm dòng.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/lines/{lineId}:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+      - { $ref: '#/components/parameters/LineId' }
+    delete:
+      tags: [Checkout]
+      operationId: removeLine
+      summary: Xóa dòng
+      description: |
+        Thu ngân tự xóa, không cần PIN, không phải chụp lại (BR-05). Dòng được giữ với người, lý do, thời gian để hậu kiểm (BR-17).
+        Khi đối chiếu, dòng xóa với `CUSTOMER_DECLINED` được trừ khỏi ảnh khay (khách đã trả lại món); lý do khác thì món vẫn tính là trên khay.
+      x-roles: [CASHIER, STORE_MANAGER]
+      parameters:
+        - name: reason
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/RemovalReason' }
+      responses:
+        '200':
+          description: Giao dịch sau khi xóa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TRANSACTION_NOT_OPEN`; `LINE_ALREADY_REMOVED`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/tray-checks:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: captureTray
+      summary: Chụp khay
+      description: |
+        Backend chụp ảnh từ camera của quầy, gửi dịch vụ nhận diện và lưu box. Mục tiêu ≤ 3 giây (G5).
+
+        - Kiểm tra chéo: web app gọi ngay khi tạo giao dịch, lúc khách vừa đặt hàng lên quầy, trước khi hàng vào túi. Chưa đối chiếu, chưa sinh cảnh báo; đối chiếu khi bấm Thanh toán (`reconciliation`).
+        - Làn nhanh: gọi khi bấm Nhận diện khay. Box của SKU đã học có độ tin ≥ ngưỡng tự nhận được thêm thành dòng nguồn `CAMERA`; box không chắc có `needs_confirmation`.
+        - Gọi lại (Chụp lại khay) thì lần chụp mới thay lần trước.
+        - Camera hoặc nhận diện lỗi **không** trả mã lỗi HTTP: lần chụp được lưu với `status: FAILED` để đếm số lần lỗi. Sau 2 lần lỗi liên tiếp, quản lý có thể cho bỏ qua (UC12).
+      x-roles: [CASHIER, STORE_MANAGER]
+      responses:
+        '201':
+          description: Đã chụp; `latest_capture` là lần chụp này
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TRANSACTION_NOT_OPEN`; `NO_ACTIVE_MODEL`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/reconciliation:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: reconcileTray
+      summary: Đối chiếu khay
+      description: |
+        Kiểm tra chéo, khi thu ngân bấm Thanh toán: so ảnh khay lúc khách đặt hàng với danh sách đã quét (UC07) và sinh cảnh báo.
+        `pay_blockers` rỗng thì web app mở hộp thoại thanh toán; còn cảnh báo Cao thì thu ngân xử lý (UC08) rồi bấm lại.
+        Từ lúc này, mỗi lần quét hoặc xóa dòng thì đối chiếu tự chạy lại. Gọi lại nhiều lần cho cùng kết quả.
+      x-roles: [CASHIER, STORE_MANAGER]
+      responses:
+        '200':
+          description: Kết quả đối chiếu; `reconciled` là true
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+              examples:
+                unscanned:
+                  $ref: '#/components/examples/CheckoutWithUnscannedAlert'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TRANSACTION_NOT_OPEN`; `NOT_VERIFY_MODE` — làn nhanh đối chiếu ngay khi xác nhận xong.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/pay:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: payTransaction
+      summary: Thanh toán
+      description: |
+        Backend đối chiếu lại rồi kiểm tra mọi điều kiện, không tin nút trên giao diện (BR-03, BR-15). Sau khi thanh toán, giao dịch không sửa được (US11).
+        Gửi lại cùng `Idempotency-Key` (mạng chập chờn) trả về đúng kết quả lần đầu, không tính tiền hai lần.
+      x-roles: [CASHIER, STORE_MANAGER]
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PayRequest' }
+            example: { payment_method: CASH, cash_received_vnd: 200000 }
+      responses:
+        '200':
+          description: Đã thanh toán; `receipt` có hóa đơn
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            `PAYMENT_BLOCKED` — `blockers` liệt kê lý do (cùng giá trị với `pay_blockers`); `TRANSACTION_NOT_OPEN`;
+            `IDEMPOTENCY_KEY_REUSED` — cùng key nhưng nội dung khác.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: https://hybridcheckout.local/problems/payment-blocked
+                title: Chưa thanh toán được
+                status: 409
+                code: PAYMENT_BLOCKED
+                detail: Còn 1 cảnh báo mức Cao.
+                blockers: [OPEN_HIGH_ALERTS]
+        '422':
+          description: '`CASH_NOT_ENOUGH`; `OUTSIDE_ZONE_NOT_CONFIRMED` (làn nhanh); `VALIDATION_ERROR`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /transactions/{transactionId}/cancel:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: cancelTransaction
+      summary: Hủy giao dịch (PIN quản lý)
+      description: Cần PIN của một quản lý khác người đang đứng quầy (UC12). Lưu người xác nhận, lý do, thời gian.
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManagerApprovalRequest' }
+      responses:
+        '200':
+          description: Giao dịch đã hủy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/PinRejected' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TRANSACTION_NOT_OPEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '423': { $ref: '#/components/responses/PinLocked' }
+  /transactions/{transactionId}/skip-tray-check:
+    parameters:
+      - { $ref: '#/components/parameters/TransactionId' }
+    post:
+      tags: [Checkout]
+      operationId: skipTrayCheck
+      summary: Bỏ qua kiểm tra khay (PIN quản lý)
+      description: Chỉ được khi 2 lần chụp gần nhất đều lỗi (UC05). Giao dịch được ghi là "không kiểm tra".
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ManagerApprovalRequest' }
+      responses:
+        '200':
+          description: Giao dịch sau khi bỏ qua
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/PinRejected' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`SKIP_NOT_ALLOWED` — chưa đủ 2 lần chụp lỗi liên tiếp; `TRANSACTION_NOT_OPEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '423': { $ref: '#/components/responses/PinLocked' }
+
+  # ------------------------------------------------------------------ alerts
+  /alerts:
+    get:
+      tags: [Alerts]
+      operationId: listAlerts
+      summary: Danh sách cảnh báo
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/AlertType' } }
+        - { name: severity, in: query, schema: { $ref: '#/components/schemas/AlertSeverity' } }
+        - { name: resolution, in: query, schema: { $ref: '#/components/schemas/AlertResolution' } }
+        - { name: cashier_id, in: query, schema: { type: integer, format: int64 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang cảnh báo, mới nhất trước
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /alerts/review-queue:
+    get:
+      tags: [Alerts]
+      operationId: getReviewQueue
+      summary: Báo nhầm cần hậu kiểm trước
+      description: Báo nhầm chưa hậu kiểm, xếp theo ưu tiên BR-17 rồi theo giá trị. `reasons` cho biết vì sao cần xem trước (view `v_review_queue`).
+      x-roles: [STORE_MANAGER]
+      parameters:
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Hàng đợi hậu kiểm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReviewQueuePage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /alerts/{alertId}/false-alarm:
+    parameters:
+      - { $ref: '#/components/parameters/AlertId' }
+    post:
+      tags: [Alerts]
+      operationId: confirmFalseAlarm
+      summary: Thu ngân xác nhận camera báo nhầm
+      description: Đóng cảnh báo mức Cao hoặc Trung bình ngay, không cần PIN, không giới hạn số lần (BR-04). Lý do bắt buộc; ảnh khay, người và thời gian được lưu để hậu kiểm.
+      x-roles: [CASHIER, STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FalseAlarmRequest' }
+      responses:
+        '200':
+          description: Giao dịch chứa cảnh báo, sau khi đóng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Checkout' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`ALERT_NOT_OPEN`; `ALERT_LOW_SEVERITY` — cảnh báo Thấp không cần xác nhận; `TRANSACTION_NOT_OPEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /alerts/{alertId}/review:
+    parameters:
+      - { $ref: '#/components/parameters/AlertId' }
+    put:
+      tags: [Alerts]
+      operationId: reviewAlert
+      summary: Hậu kiểm một báo nhầm
+      description: Chỉ cho cảnh báo đã được thu ngân xác nhận báo nhầm (UC14). Gửi lại thì ghi đè kết quả cũ, nhật ký giữ cả hai lần.
+      x-roles: [STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewRequest' }
+      responses:
+        '200':
+          description: Cảnh báo sau khi hậu kiểm
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AlertListItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`ALERT_NOT_FALSE_ALARM`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ catalog
+  /categories:
+    get:
+      tags: [Catalog]
+      operationId: listCategories
+      summary: Danh sách nhóm hàng
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Nhóm hàng
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /skus:
+    get:
+      tags: [Catalog]
+      operationId: listSkus
+      summary: Danh mục SKU
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - name: q
+          in: query
+          description: Tìm theo tên hoặc mã vạch
+          schema: { type: string, maxLength: 100 }
+        - { name: category_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: learn_status, in: query, schema: { $ref: '#/components/schemas/LearnStatus' } }
+        - { name: is_selling, in: query, schema: { type: boolean } }
+        - { name: batch_id, in: query, schema: { type: integer, format: int64 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang SKU và thẻ tóm tắt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkuPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Catalog]
+      operationId: createSku
+      summary: Thêm SKU
+      description: SKU mới ở trạng thái Chưa học (US15). Mã vạch không trùng (BR-14).
+      x-roles: [STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkuCreate' }
+      responses:
+        '201':
+          description: Đã thêm
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sku' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`BARCODE_TAKEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /skus/import:
+    post:
+      tags: [Catalog]
+      operationId: importSkus
+      summary: Nhập SKU từ CSV
+      description: |
+        Cột `barcode,name,category_code,price_vnd`. Tất cả hoặc không: một dòng lỗi thì không nhập dòng nào, trả danh sách lỗi theo dòng.
+        `dry_run=true` chỉ kiểm tra.
+      x-roles: [STORE_MANAGER]
+      parameters:
+        - { name: dry_run, in: query, schema: { type: boolean, default: false } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, contentMediaType: text/csv, description: 'Tối đa 2 MB, 5.000 dòng, UTF-8' }
+      responses:
+        '200':
+          description: Kết quả nhập
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkuImportResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /skus/{skuId}:
+    parameters:
+      - { $ref: '#/components/parameters/SkuId' }
+    get:
+      tags: [Catalog]
+      operationId: getSku
+      summary: Chi tiết SKU
+      description: Kèm trạng thái học, SKU hay bị nhầm với và ảnh cắt đã nhận (M06).
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: SKU
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkuDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Catalog]
+      operationId: updateSku
+      summary: Sửa SKU, đổi giá, ngừng bán
+      description: Chỉ quản lý (BR-14). Đổi giá không ảnh hưởng giao dịch cũ vì dòng giữ giá lúc bán. Ghi nhật ký.
+      x-roles: [STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkuUpdate' }
+      responses:
+        '200':
+          description: SKU sau khi sửa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Sku' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ batches
+  /batches:
+    get:
+      tags: [Batches]
+      operationId: listBatches
+      summary: Danh sách đợt nhập
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Các đợt, mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Batch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Batches]
+      operationId: createBatch
+      summary: Tạo đợt nhập
+      description: Gom các SKU Chưa học thành một đợt; SKU chuyển sang Đang học (US16).
+      x-roles: [STORE_MANAGER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchCreate' }
+      responses:
+        '201':
+          description: Đợt mới, trạng thái DRAFT
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`SKU_NOT_UNLEARNED` — `detail` liệt kê SKU đã thuộc một đợt.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /batches/{batchId}:
+    parameters:
+      - { $ref: '#/components/parameters/BatchId' }
+    get:
+      tags: [Batches]
+      operationId: getBatch
+      summary: Chi tiết đợt nhập
+      description: Tiến trình, dữ liệu theo SKU so với mục tiêu BR-11, điều kiện gửi huấn luyện, job và phiên bản của đợt (M08).
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Đợt
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /batches/{batchId}/samples:
+    parameters:
+      - { $ref: '#/components/parameters/BatchId' }
+    get:
+      tags: [Batches]
+      operationId: listSamples
+      summary: Ảnh mẫu và ảnh cắt nền của đợt
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { name: sku_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/SampleStatus' } }
+      responses:
+        '200':
+          description: Ảnh mẫu
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SkuSample' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Batches]
+      operationId: uploadSamples
+      summary: Tải ảnh mẫu của một SKU mới
+      description: |
+        Mỗi ảnh một sản phẩm, chụp từ trên xuống (UC17). Cắt nền chạy nền qua dịch vụ nhận diện; trong lúc đó `cutout_url` là null.
+        Frontend hỏi lại `listSamples` đến khi mọi ảnh có ảnh cắt.
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [sku_id, files]
+              properties:
+                sku_id: { type: integer, format: int64 }
+                files:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items: { type: string, contentMediaType: image/jpeg, description: 'JPEG hoặc PNG, ≤ 10 MB mỗi ảnh' }
+            encoding:
+              files: { contentType: 'image/jpeg, image/png' }
+      responses:
+        '202':
+          description: Đã nhận ảnh, đang cắt nền
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SkuSample' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`BATCH_NOT_COLLECTING` — đợt đã gửi huấn luyện; `SKU_NOT_IN_BATCH`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /batches/{batchId}/samples/review:
+    parameters:
+      - { $ref: '#/components/parameters/BatchId' }
+    post:
+      tags: [Batches]
+      operationId: reviewSamples
+      summary: Nhận hoặc loại ảnh cắt (hàng loạt)
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SampleReview' }
+      responses:
+        '200':
+          description: Các ảnh sau khi duyệt
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SkuSample' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`CUTOUT_NOT_READY` — ảnh chưa cắt nền xong; `BATCH_NOT_COLLECTING`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /batches/{batchId}/composites:
+    parameters:
+      - { $ref: '#/components/parameters/BatchId' }
+    post:
+      tags: [Batches]
+      operationId: createComposites
+      summary: Tạo ảnh ghép
+      description: Tạo job `COMPOSITE` dán ảnh cắt đã nhận lên nền khay. Chỉ khi mọi SKU mới đủ ảnh cắt (BR-11, US17).
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompositeRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/JobAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BatchNotReady' }
+  /batches/{batchId}/training:
+    parameters:
+      - { $ref: '#/components/parameters/BatchId' }
+    post:
+      tags: [Batches]
+      operationId: startTraining
+      summary: Gửi huấn luyện
+      description: |
+        Tạo job `TRAIN`; job xong thì tự chạy `EVAL` và sinh phiên bản Chờ duyệt. Chỉ khi đạt đủ BR-11.
+        `mix_real_images` > 0 trộn ảnh thật vượt mức vào huấn luyện (BR-16, thí nghiệm), ghi vào `params` của job.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TrainingRequest' }
+      responses:
+        '202': { $ref: '#/components/responses/JobAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/BatchNotReady' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ labeling
+  /label-tasks:
+    get:
+      tags: [Labeling]
+      operationId: listLabelTasks
+      summary: Hàng đợi ảnh thật
+      description: '`batch_id` bỏ trống và `unassigned=true` để xem ảnh khó đang chờ đợt sau.'
+      x-roles: [ML_ENGINEER]
+      parameters:
+        - { name: batch_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: unassigned, in: query, schema: { type: boolean, default: false } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/LabelStatus' } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang ảnh
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTaskPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Labeling]
+      operationId: queueHardImage
+      summary: Gửi ảnh khay vào hàng đợi ảnh khó
+      description: Từ Chi tiết giao dịch (M03) hoặc Giám sát (L07). Ảnh được chép sang kho dữ liệu nên không bị xóa sau 30 ngày; gắn vào đợt đang thu thập, nếu không có thì chờ đợt sau.
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/HardImageRequest' }
+      responses:
+        '201':
+          description: Đã vào hàng đợi
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTaskSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`ALREADY_QUEUED`; `IMAGE_PURGED` — ảnh đã quá hạn lưu.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /label-tasks/next:
+    get:
+      tags: [Labeling]
+      operationId: getNextLabelTask
+      summary: Ảnh tiếp theo cần gán nhãn
+      x-roles: [ML_ENGINEER]
+      parameters:
+        - name: batch_id
+          in: query
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Ảnh tiếp theo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTask' }
+        '204': { description: Hết ảnh trong hàng đợi }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /label-tasks/{taskId}:
+    parameters:
+      - { $ref: '#/components/parameters/TaskId' }
+    get:
+      tags: [Labeling]
+      operationId: getLabelTask
+      summary: Xem một ảnh cần gán nhãn
+      description: Ảnh, box hàng cũ do model đề xuất (từ lần nhận diện tại quầy) và hàng mới theo mã vạch cần vẽ.
+      x-roles: [ML_ENGINEER]
+      responses:
+        '200':
+          description: Ảnh
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTask' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /label-tasks/{taskId}/submit:
+    parameters:
+      - { $ref: '#/components/parameters/TaskId' }
+    post:
+      tags: [Labeling]
+      operationId: submitLabels
+      summary: Lưu nhãn vào tập dữ liệu
+      description: |
+        Mọi đề xuất phải được chấp nhận hoặc từ chối (BR-12). Chỉ box được chấp nhận và box vẽ tay thành nhãn.
+        Backend chọn tập: VAL trước, TRAIN chỉ khi vượt mục tiêu BR-11 và đợt bật trộn ảnh thật; không chia một giao dịch vào hai tập (BR-16).
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LabelSubmit' }
+      responses:
+        '200':
+          description: Ảnh đã lưu
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTask' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: |
+            `TASK_NOT_PENDING`; `PROPOSALS_UNDECIDED` — còn đề xuất chưa duyệt;
+            `COUNT_MISMATCH` — số box hàng mới khác số lượng theo mã vạch, gửi lại với `acknowledge_count_mismatch: true` nếu chắc chắn.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /label-tasks/{taskId}/skip:
+    parameters:
+      - { $ref: '#/components/parameters/TaskId' }
+    post:
+      tags: [Labeling]
+      operationId: skipLabelTask
+      summary: Bỏ qua ảnh
+      description: Ảnh mờ hoặc không có hàng mới; lý do bắt buộc.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Ảnh đã bỏ qua
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LabelTaskSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`TASK_NOT_PENDING`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ jobs
+  /jobs:
+    get:
+      tags: [Jobs]
+      operationId: listJobs
+      summary: Danh sách job
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { name: batch_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: type, in: query, schema: { $ref: '#/components/schemas/JobType' } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/JobStatus' } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang job, mới nhất trước
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JobPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /jobs/{jobId}:
+    parameters:
+      - { $ref: '#/components/parameters/JobId' }
+    get:
+      tags: [Jobs]
+      operationId: getJob
+      summary: Xem job
+      description: Frontend hỏi lại mỗi 3 giây khi job đang chạy.
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /jobs/{jobId}/log:
+    parameters:
+      - { $ref: '#/components/parameters/JobId' }
+    get:
+      tags: [Jobs]
+      operationId: getJobLog
+      summary: Xem log job
+      x-roles: [ML_ENGINEER]
+      parameters:
+        - name: tail
+          in: query
+          description: Số dòng cuối
+          schema: { type: integer, minimum: 1, maximum: 5000, default: 500 }
+      responses:
+        '200':
+          description: Log dạng văn bản
+          content:
+            text/plain:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /jobs/{jobId}/cancel:
+    parameters:
+      - { $ref: '#/components/parameters/JobId' }
+    post:
+      tags: [Jobs]
+      operationId: cancelJob
+      summary: Hủy job
+      x-roles: [ML_ENGINEER]
+      responses:
+        '200':
+          description: Job sau khi hủy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`JOB_FINISHED`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /jobs/{jobId}/retry:
+    parameters:
+      - { $ref: '#/components/parameters/JobId' }
+    post:
+      tags: [Jobs]
+      operationId: retryJob
+      summary: Chạy lại job
+      description: Tạo job mới cùng loại và tham số với job lỗi hoặc đã hủy.
+      x-roles: [ML_ENGINEER]
+      responses:
+        '202': { $ref: '#/components/responses/JobAccepted' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`JOB_NOT_RETRYABLE` — job chưa lỗi/hủy; `JOB_ALREADY_RUNNING` — đợt đã có job cùng loại đang chạy.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  # ------------------------------------------------------------------ models
+  /model-versions:
+    get:
+      tags: [Models]
+      operationId: listModelVersions
+      summary: Danh sách phiên bản model
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ModelStatus' } }
+      responses:
+        '200':
+          description: Các phiên bản, mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ModelVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /model-versions/active:
+    get:
+      tags: [Models]
+      operationId: getActiveModelVersion
+      summary: Phiên bản đang chạy
+      description: Hiện trên thanh trạng thái quầy và thanh trên khu quản trị.
+      x-roles: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN]
+      responses:
+        '200':
+          description: Phiên bản đang chạy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: '`NO_ACTIVE_MODEL` — chưa deploy phiên bản nào; quầy chỉ bán bằng mã vạch.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /model-versions/{versionId}:
+    parameters:
+      - { $ref: '#/components/parameters/VersionId' }
+    get:
+      tags: [Models]
+      operationId: getModelVersion
+      summary: Chi tiết phiên bản và cổng duyệt
+      description: Từng điều kiện BR-09 với giá trị mới, giá trị bản đang chạy, Đạt/Không đạt (US21); top cặp SKU hay nhầm.
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Phiên bản
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelVersionDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /model-versions/{versionId}/deploy:
+    parameters:
+      - { $ref: '#/components/parameters/VersionId' }
+    post:
+      tags: [Models]
+      operationId: deployModelVersion
+      summary: Deploy phiên bản
+      description: |
+        Chỉ một phiên bản chạy tại một thời điểm (BR-07). Không đạt cổng duyệt thì `reason` bắt buộc và được ghi là override (BR-08).
+        Sau deploy, SKU của đợt thành Đã học và dịch vụ nhận diện nạp checkpoint mới.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeployRequest' }
+      responses:
+        '200':
+          description: Bản ghi deploy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deployment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`VERSION_NOT_PENDING`; `GATE_REASON_REQUIRED` — không đạt cổng mà thiếu lý do.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '503': { $ref: '#/components/responses/InferenceUnavailable' }
+  /model-versions/{versionId}/reject:
+    parameters:
+      - { $ref: '#/components/parameters/VersionId' }
+    post:
+      tags: [Models]
+      operationId: rejectModelVersion
+      summary: Từ chối phiên bản
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Phiên bản sau khi từ chối
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`VERSION_NOT_PENDING`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /model-deployments:
+    get:
+      tags: [Models]
+      operationId: listDeployments
+      summary: Lịch sử deploy và rollback
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      responses:
+        '200':
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Deployment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /model-deployments/rollback:
+    post:
+      tags: [Models]
+      operationId: rollbackModel
+      summary: Rollback về phiên bản liền trước
+      description: Luôn rollback được (BR-08). SKU của đợt bị rollback về Đang học, đợt về Chờ duyệt. Lý do bắt buộc.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReasonRequest' }
+      responses:
+        '200':
+          description: Bản ghi rollback
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deployment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`NO_PREVIOUS_VERSION`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '503': { $ref: '#/components/responses/InferenceUnavailable' }
+
+  # ------------------------------------------------------------------ thresholds
+  /thresholds:
+    get:
+      tags: [Thresholds]
+      operationId: listThresholds
+      summary: Ngưỡng đang áp dụng theo đợt
+      x-roles: [ML_ENGINEER]
+      responses:
+        '200':
+          description: Bản mới nhất của mỗi đợt
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ThresholdConfig' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Thresholds]
+      operationId: saveThresholds
+      summary: Lưu ngưỡng mới cho một đợt
+      description: Thêm một bản mới (không sửa bản cũ). Hoàn tác = lưu lại giá trị của một bản trong lịch sử (US23). Ghi nhật ký.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThresholdInput' }
+      responses:
+        '201':
+          description: Bản ngưỡng mới
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThresholdConfig' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /thresholds/history:
+    get:
+      tags: [Thresholds]
+      operationId: listThresholdHistory
+      summary: Lịch sử ngưỡng của một đợt
+      x-roles: [ML_ENGINEER]
+      parameters:
+        - name: batch_id
+          in: query
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Mới nhất trước
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ThresholdConfig' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /thresholds/preview:
+    post:
+      tags: [Thresholds]
+      operationId: previewThresholds
+      summary: Xem trước tác động của ngưỡng
+      description: Tính lại bắt món sót, báo nhầm, % tự nhận trên tập val của phiên bản đang chạy (BR-10), không lưu gì.
+      x-roles: [ML_ENGINEER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThresholdInput' }
+      responses:
+        '200':
+          description: Chỉ số dự kiến
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ThresholdPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ reports
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      operationId: getDashboard
+      summary: Dashboard cửa hàng
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - { name: counter_id, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Chỉ số trong khoảng thời gian
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Dashboard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /reports/cashiers:
+    get:
+      tags: [Reports]
+      operationId: getCashierStats
+      summary: Báo nhầm và xóa dòng theo thu ngân
+      description: Cửa sổ `audit.window_days` ngày. Cờ bất thường theo BR-17 (views `v_cashier_alert_stats`, `v_cashier_removal_stats`).
+      x-roles: [STORE_MANAGER]
+      responses:
+        '200':
+          description: Thống kê
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CashierStatsReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /reports/monitoring:
+    get:
+      tags: [Reports]
+      operationId: getMonitoring
+      summary: Giám sát model
+      description: Độ trễ, tỉ lệ cảnh báo, báo nhầm, % tự nhận theo ngày; cặp hay nhầm; báo nhầm tại quầy theo cặp SKU (L07).
+      x-roles: [STORE_MANAGER, ML_ENGINEER]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+      responses:
+        '200':
+          description: Số liệu giám sát
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Monitoring' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  # ------------------------------------------------------------------ users
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: Danh sách người dùng
+      x-roles: [ADMIN]
+      parameters:
+        - { name: role, in: query, schema: { $ref: '#/components/schemas/UserRole' } }
+        - { name: is_active, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string, maxLength: 100 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang người dùng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Tạo người dùng
+      description: Trả mật khẩu tạm một lần; người dùng đổi ở lần đăng nhập đầu.
+      x-roles: [ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreate' }
+      responses:
+        '201':
+          description: Đã tạo
+          headers:
+            Location: { $ref: '#/components/headers/Location' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserWithTemporaryPassword' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: '`EMAIL_TAKEN`.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{userId}:
+    parameters:
+      - { $ref: '#/components/parameters/UserId' }
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Sửa, đổi vai trò, khóa hoặc mở khóa
+      description: Khóa tài khoản thu hồi mọi refresh token của người đó. Không tự khóa hay tự đổi vai trò chính mình (US25). Ghi nhật ký.
+      x-roles: [ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdate' }
+      responses:
+        '200':
+          description: Người dùng sau khi sửa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`SELF_CHANGE_FORBIDDEN`; `USER_HAS_OPEN_SHIFT` — không đổi vai trò khi đang có ca mở.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /users/{userId}/reset-password:
+    parameters:
+      - { $ref: '#/components/parameters/UserId' }
+    post:
+      tags: [Users]
+      operationId: resetPassword
+      summary: Đặt lại mật khẩu
+      x-roles: [ADMIN]
+      responses:
+        '200':
+          description: Mật khẩu tạm, chỉ hiện một lần
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserWithTemporaryPassword' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ system
+  /audit-logs:
+    get:
+      tags: [System]
+      operationId: listAuditLogs
+      summary: Nhật ký thao tác
+      description: Chỉ đọc; không có thao tác sửa hay xóa (US27).
+      x-roles: [STORE_MANAGER, ADMIN]
+      parameters:
+        - { $ref: '#/components/parameters/From' }
+        - { $ref: '#/components/parameters/To' }
+        - { name: actor_id, in: query, schema: { type: integer, format: int64 } }
+        - { name: action, in: query, schema: { type: string, maxLength: 40 }, example: DELETE_LINE }
+        - { name: entity_type, in: query, schema: { type: string, maxLength: 40 } }
+        - { name: entity_id, in: query, schema: { type: integer, format: int64 } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/PageSize' }
+      responses:
+        '200':
+          description: Một trang nhật ký, mới nhất trước
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuditLogPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /settings:
+    get:
+      tags: [System]
+      operationId: listSettings
+      summary: Cài đặt
+      description: Thời gian giữ ảnh, giá trị cổng duyệt, mục tiêu dữ liệu, tham số hậu kiểm (bảng `settings`).
+      x-roles: [ADMIN]
+      responses:
+        '200':
+          description: Mọi cài đặt
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Setting' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [System]
+      operationId: updateSettings
+      summary: Sửa cài đặt
+      description: Chỉ gửi các khóa cần đổi. Khóa lạ hoặc giá trị sai kiểu thì không đổi khóa nào. Ghi nhật ký.
+      x-roles: [ADMIN]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettingsUpdate' }
+            example: { retention.transaction_days: 30, retention.batch_days: 14 }
+      responses:
+        '200':
+          description: Mọi cài đặt sau khi sửa
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Setting' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /storage-usage:
+    get:
+      tags: [System]
+      operationId: getStorageUsage
+      summary: Dung lượng lưu trữ
+      x-roles: [ADMIN]
+      responses:
+        '200':
+          description: Dung lượng theo nhóm ảnh
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StorageUsage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      summary: Health check
+      description: '`ok` khi backend kết nối được PostgreSQL, Redis, kho ảnh; trạng thái dịch vụ nhận diện báo riêng vì quầy vẫn bán được bằng mã vạch khi nó lỗi.'
+      security: []
+      responses:
+        '200':
+          description: Backend sẵn sàng
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '503':
+          description: Một phụ thuộc bắt buộc lỗi
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'Access token 15 phút. Claims: `sub` (user id), `role`, `exp`.'
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: hc_refresh
+      description: Refresh token ngẫu nhiên, lưu bản băm ở Redis, xoay vòng mỗi lần dùng.
+
+  headers:
+    Location:
+      description: URL của tài nguyên vừa tạo
+      schema: { type: string, format: uri-reference }
+    RefreshCookie:
+      description: '`hc_refresh=<token>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=43200`'
+      schema: { type: string }
+    RetryAfter:
+      description: Số giây cần chờ
+      schema: { type: integer }
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    From:
+      name: from
+      in: query
+      description: Từ thời điểm (gồm)
+      schema: { type: string, format: date-time }
+    To:
+      name: to
+      in: query
+      description: Đến thời điểm (không gồm)
+      schema: { type: string, format: date-time }
+    IncludeInactive:
+      name: include_inactive
+      in: query
+      schema: { type: boolean, default: false }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID do frontend sinh cho mỗi thao tác; backend nhớ kết quả 24 giờ.
+      schema: { type: string, format: uuid }
+    CounterId: { name: counterId, in: path, required: true, schema: { type: integer, format: int64 } }
+    ShiftId: { name: shiftId, in: path, required: true, schema: { type: integer, format: int64 } }
+    TransactionId: { name: transactionId, in: path, required: true, schema: { type: integer, format: int64 } }
+    LineId: { name: lineId, in: path, required: true, schema: { type: integer, format: int64 } }
+    AlertId: { name: alertId, in: path, required: true, schema: { type: integer, format: int64 } }
+    SkuId: { name: skuId, in: path, required: true, schema: { type: integer, format: int64 } }
+    BatchId: { name: batchId, in: path, required: true, schema: { type: integer, format: int64 } }
+    TaskId: { name: taskId, in: path, required: true, schema: { type: integer, format: int64 } }
+    JobId: { name: jobId, in: path, required: true, schema: { type: integer, format: int64 } }
+    VersionId: { name: versionId, in: path, required: true, schema: { type: integer, format: int64 } }
+    UserId: { name: userId, in: path, required: true, schema: { type: integer, format: int64 } }
+
+  responses:
+    Unauthorized:
+      description: '`UNAUTHENTICATED` — thiếu, sai hoặc hết hạn token.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InvalidCredentials:
+      description: '`INVALID_CREDENTIALS` — sai email/mật khẩu hoặc tài khoản bị khóa, cùng một thông báo.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: '`FORBIDDEN` — vai trò không được phép, hoặc không phải dữ liệu của mình.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: '`NOT_FOUND`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Xung đột với dữ liệu hiện có; `code` cho biết cụ thể.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: '`VALIDATION_ERROR` — `errors` liệt kê từng field sai.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://hybridcheckout.local/problems/validation-error
+            title: Dữ liệu không hợp lệ
+            status: 422
+            code: VALIDATION_ERROR
+            errors:
+              - { field: price_vnd, message: Giá phải lớn hơn 0 }
+    PayloadTooLarge:
+      description: '`PAYLOAD_TOO_LARGE`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: '`RATE_LIMITED` — quá 5 lần đăng nhập sai trong 15 phút từ một địa chỉ.'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PinRejected:
+      description: |
+        `PIN_INVALID` — PIN sai, `attempts_left` cho biết còn mấy lần; `PIN_OWN` — PIN của chính người đang đứng quầy;
+        `FORBIDDEN` — vai trò không được phép.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PinLocked:
+      description: '`PIN_LOCKED` — sai 3 lần, quầy khóa nhập PIN 5 phút (US08).'
+      headers:
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    CameraUnavailable:
+      description: '`CAMERA_UNAVAILABLE` — không chụp được ảnh từ camera của quầy.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InferenceUnavailable:
+      description: '`INFERENCE_UNAVAILABLE` — dịch vụ nhận diện không nạp được checkpoint; không có gì bị đổi.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    BatchNotReady:
+      description: '`BATCH_NOT_READY` — `unmet` liệt kê điều kiện BR-11 chưa đạt; `JOB_ALREADY_RUNNING`; `BATCH_NOT_COLLECTING`.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://hybridcheckout.local/problems/batch-not-ready
+            title: Đợt chưa đủ dữ liệu
+            status: 409
+            code: BATCH_NOT_READY
+            unmet: [VAL_IMAGES, VAL_BOXES]
+    JobAccepted:
+      description: Đã xếp job vào hàng đợi; theo dõi qua `Location`.
+      headers:
+        Location: { $ref: '#/components/headers/Location' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Job' }
+
+  examples:
+    CheckoutWithUnscannedAlert:
+      summary: Kiểm tra chéo, camera thấy một món chưa quét
+      value:
+        id: 1042
+        code: GD1042
+        mode: VERIFY
+        status: OPEN
+        shift_id: 12
+        counter: { id: 1, code: Q1, name: Quầy 1 }
+        cashier: { id: 3, full_name: Trần Minh Khoa, role: CASHIER }
+        started_at: '2026-10-31T09:15:02+07:00'
+        closed_at: null
+        lines:
+          - id: 5001
+            sku: { id: 17, barcode: '2000000000176', name: Bánh quy bơ 200g, is_learned: true }
+            qty: 1
+            unit_price_vnd: 32000
+            amount_vnd: 32000
+            source: BARCODE
+            detection_id: null
+            added_at: '2026-10-31T09:15:02+07:00'
+        removed_lines: []
+        subtotal_vnd: 32000
+        latest_capture:
+          id: 880
+          status: SUCCEEDED
+          captured_at: '2026-10-31T09:15:20+07:00'
+          latency_ms: 1240
+          model_version: { id: 4, code: v4 }
+          image_url: https://storage.local/tray-images/880.jpg?X-Amz-Expires=600
+          error: null
+          detections:
+            - { id: 9001, sku: { id: 17, barcode: '2000000000176', name: Bánh quy bơ 200g, is_learned: true }, score: 0.97, box: { x: 0.12, y: 0.20, w: 0.22, h: 0.18 }, state: MATCHED, confirmed_sku_id: null }
+            - { id: 9002, sku: { id: 42, barcode: '2000000000428', name: Nước tăng lực 250ml, is_learned: true }, score: 0.93, box: { x: 0.55, y: 0.48, w: 0.12, h: 0.25 }, state: ALERT, confirmed_sku_id: null }
+        alerts:
+          - id: 301
+            capture_id: 880
+            type: UNSCANNED_ITEM
+            severity: HIGH
+            seen_sku: { id: 42, barcode: '2000000000428', name: Nước tăng lực 250ml, is_learned: true }
+            scanned_sku: null
+            qty: 1
+            value_vnd: 15000
+            resolution: OPEN
+            reason: null
+            resolved_by: null
+            resolved_at: null
+            detection_ids: [9002]
+            created_at: '2026-10-31T09:15:21+07:00'
+        reconciled: true
+        failed_captures_in_row: 0
+        tray_check_skipped: false
+        approvals: []
+        pay_blockers: [OPEN_HIGH_ALERTS]
+        payment: null
+
+  schemas:
+    # -------------------------------------------------------------- errors and paging
+    Problem:
+      type: object
+      description: RFC 9457 Problem Details, thêm `code` ổn định và các field mở rộng theo từng lỗi.
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string, format: uri-reference }
+        code: { type: string, examples: [PAYMENT_BLOCKED] }
+        errors:
+          type: array
+          description: Chỉ với `VALIDATION_ERROR`
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field: { type: string }
+              message: { type: string }
+        blockers:
+          type: array
+          description: Chỉ với `PAYMENT_BLOCKED`
+          items: { $ref: '#/components/schemas/PayBlocker' }
+        unmet:
+          type: array
+          description: Chỉ với `BATCH_NOT_READY`
+          items: { $ref: '#/components/schemas/ReadinessCondition' }
+        attempts_left:
+          type: integer
+          description: Chỉ với `PIN_INVALID`
+    PageMeta:
+      type: object
+      required: [page, page_size, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+        total: { type: integer, minimum: 0 }
+
+    # -------------------------------------------------------------- enums (khớp schema.dbml)
+    UserRole: { type: string, enum: [CASHIER, STORE_MANAGER, ML_ENGINEER, ADMIN] }
+    CheckoutMode:
+      type: string
+      enum: [VERIFY, FAST]
+      description: VERIFY = Kiểm tra chéo, FAST = Làn nhanh
+    TransactionStatus: { type: string, enum: [OPEN, PAID, CANCELLED] }
+    PaymentMethod: { type: string, enum: [CASH, CARD, TRANSFER] }
+    LineSource: { type: string, enum: [BARCODE, CAMERA] }
+    CaptureStatus: { type: string, enum: [SUCCEEDED, FAILED] }
+    AlertType:
+      type: string
+      enum: [UNSCANNED_ITEM, SUSPECTED_SWAP, SCANNED_NOT_SEEN]
+      description: Món chưa quét · Nghi tráo mã · Quét nhưng camera không thấy
+    AlertSeverity: { type: string, enum: [HIGH, MEDIUM, LOW] }
+    AlertResolution: { type: string, enum: [OPEN, SCANNED, FALSE_ALARM, AUTO_CLOSED] }
+    ReviewResult:
+      type: string
+      enum: [ALERT_CORRECT, MODEL_ERROR, SUSPECTED_FRAUD]
+      description: Cảnh báo đúng · Báo nhầm thật (lỗi model) · Nghi gian lận
+    ApprovalAction: { type: string, enum: [CANCEL_TRANSACTION, SKIP_TRAY_CHECK] }
+    RemovalReason:
+      type: string
+      enum: [CUSTOMER_DECLINED, WRONG_ITEM, DUPLICATE_SCAN]
+      description: Khách không lấy nữa · Quét nhầm mã · Quét trùng
+    BatchStatus: { type: string, enum: [DRAFT, COLLECTING, TRAINING, PENDING_REVIEW, DEPLOYED] }
+    SampleStatus: { type: string, enum: [PENDING, ACCEPTED, REJECTED] }
+    LabelSource:
+      type: string
+      enum: [NEW_SKU_SALE, HARD_IMAGE]
+      description: Giao dịch có hàng mới · Ảnh khó do người gửi
+    LabelStatus: { type: string, enum: [PENDING, LABELED, SKIPPED] }
+    DatasetSplit: { type: string, enum: [VAL, TRAIN] }
+    AnnotationOrigin: { type: string, enum: [MODEL_PROPOSAL, MANUAL] }
+    JobType: { type: string, enum: [COMPOSITE, TRAIN, EVAL] }
+    JobStatus: { type: string, enum: [QUEUED, RUNNING, EVALUATING, SUCCEEDED, FAILED, CANCELLED] }
+    ModelStatus: { type: string, enum: [PENDING_REVIEW, ACTIVE, RETIRED, REJECTED] }
+    DeploymentAction: { type: string, enum: [DEPLOY, ROLLBACK] }
+    LearnStatus:
+      type: string
+      enum: [LEARNED, LEARNING, NOT_LEARNED]
+      description: Tính từ view `v_sku_learn_status`, không lưu cột riêng
+    DetectionState:
+      type: string
+      enum: [DETECTED, MATCHED, ALERT, AUTO_ADDED, NEEDS_CONFIRMATION, CONFIRMED, UNCERTAIN]
+      description: |
+        Cách vẽ box trên ảnh khay: DETECTED (kiểm tra chéo, chưa đối chiếu: chỉ hiện ảnh) · MATCHED xanh (khớp danh sách quét) · ALERT đỏ (gây cảnh báo) · AUTO_ADDED xanh (làn nhanh tự thêm) ·
+        NEEDS_CONFIRMATION cam có số (làn nhanh, chờ quét) · CONFIRMED (đã quét xác nhận) · UNCERTAIN xám nét đứt (giữa ngưỡng thấp và ngưỡng cảnh báo).
+    PayBlocker:
+      type: string
+      enum: [EMPTY_CART, TRAY_NOT_CAPTURED, CAPTURE_FAILED, OPEN_HIGH_ALERTS, UNCONFIRMED_DETECTIONS]
+      description: |
+        Lý do chưa thanh toán được: giỏ trống · chưa có ảnh khay · lần chụp gần nhất lỗi ·
+        còn cảnh báo mức Cao (sau khi đối chiếu) · làn nhanh còn box cam chưa quét.
+    ReadinessCondition:
+      type: string
+      enum: [CUTOUTS, COMPOSITES, VAL_IMAGES, VAL_BOXES]
+      description: Điều kiện BR-11 — đủ ảnh cắt mỗi SKU · đã tạo ảnh ghép · đủ ảnh thật trong tập kiểm tra · đủ box mỗi SKU mới
+    ReviewPriorityReason:
+      type: string
+      enum: [HIGH_VALUE, ANOMALOUS_CASHIER, RANDOM_SAMPLE]
+
+    # -------------------------------------------------------------- small shared objects
+    Box:
+      type: object
+      description: Tọa độ chuẩn hóa 0..1 theo kích thước ảnh, gốc ở góc trên trái
+      required: [x, y, w, h]
+      properties:
+        x: { type: number, minimum: 0, maximum: 1 }
+        y: { type: number, minimum: 0, maximum: 1 }
+        w: { type: number, exclusiveMinimum: 0, maximum: 1 }
+        h: { type: number, exclusiveMinimum: 0, maximum: 1 }
+    UserRef:
+      type: object
+      required: [id, full_name, role]
+      properties:
+        id: { type: integer, format: int64 }
+        full_name: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+    CounterRef:
+      type: object
+      required: [id, code, name]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string, examples: [Q1] }
+        name: { type: string }
+    SkuRef:
+      type: object
+      required: [id, barcode, name, is_learned]
+      properties:
+        id: { type: integer, format: int64 }
+        barcode: { type: string }
+        name: { type: string }
+        is_learned:
+          type: boolean
+          description: Model đang chạy đã học SKU này; false thì quầy gắn nhãn "Camera chưa nhận diện"
+    BatchRef:
+      type: object
+      required: [id, seq_no, name]
+      properties:
+        id: { type: integer, format: int64 }
+        seq_no: { type: integer, description: 'Hiện là "Đợt 5"' }
+        name: { type: string }
+    ModelVersionRef:
+      type: object
+      required: [id, code]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string, examples: [v4] }
+    ReasonRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 300 }
+
+    # -------------------------------------------------------------- auth and users
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 1, maxLength: 128, writeOnly: true }
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in, user]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, description: Giây, examples: [900] }
+        user: { $ref: '#/components/schemas/User' }
+    User:
+      type: object
+      required: [id, email, full_name, role, is_active, has_pin, must_change_password, last_login_at, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        role: { $ref: '#/components/schemas/UserRole' }
+        is_active: { type: boolean }
+        has_pin: { type: boolean, description: Quản lý đã đặt PIN }
+        must_change_password: { type: boolean, description: Đang dùng mật khẩu tạm }
+        last_login_at: { type: [string, 'null'], format: date-time }
+        created_at: { type: string, format: date-time }
+    UserPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/User' }
+    UserCreate:
+      type: object
+      required: [email, full_name, role]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        full_name: { type: string, minLength: 1, maxLength: 100 }
+        role: { $ref: '#/components/schemas/UserRole' }
+    UserUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 100 }
+        role: { $ref: '#/components/schemas/UserRole' }
+        is_active: { type: boolean }
+    UserWithTemporaryPassword:
+      allOf:
+        - { $ref: '#/components/schemas/User' }
+        - type: object
+          required: [temporary_password]
+          properties:
+            temporary_password: { type: string, description: Chỉ trả một lần, không lưu dạng rõ }
+    ProfileUpdate:
+      type: object
+      required: [full_name]
+      properties:
+        full_name: { type: string, minLength: 1, maxLength: 100 }
+    PasswordChange:
+      type: object
+      required: [current_password, new_password]
+      properties:
+        current_password: { type: string, writeOnly: true }
+        new_password: { type: string, minLength: 8, maxLength: 128, writeOnly: true }
+    PinSet:
+      type: object
+      required: [current_password, pin]
+      properties:
+        current_password: { type: string, writeOnly: true, description: Xác nhận lại danh tính trước khi đổi PIN }
+        pin: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+
+    # -------------------------------------------------------------- counters and shifts
+    Counter:
+      type: object
+      required: [id, code, name, camera_name, camera_online, camera_last_seen_at, is_active, open_shift]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        camera_name: { type: string }
+        camera_url:
+          type: string
+          format: uri
+          description: Địa chỉ chụp ảnh của camera IP; chỉ trả cho quản trị viên
+        camera_online: { type: boolean, description: Có heartbeat trong 30 giây gần nhất }
+        camera_last_seen_at: { type: [string, 'null'], format: date-time }
+        is_active: { type: boolean }
+        open_shift:
+          description: Ca đang mở ở quầy, nếu có
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [id, cashier]
+              properties:
+                id: { type: integer, format: int64 }
+                cashier: { $ref: '#/components/schemas/UserRef' }
+    CounterCreate:
+      type: object
+      required: [code, name, camera_name, camera_url]
+      properties:
+        code: { type: string, pattern: '^[A-Z0-9]{1,10}$' }
+        name: { type: string, minLength: 1, maxLength: 50 }
+        camera_name: { type: string, minLength: 1, maxLength: 50 }
+        camera_url: { type: string, format: uri, maxLength: 255 }
+    CounterUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        camera_name: { type: string, minLength: 1, maxLength: 50 }
+        camera_url: { type: string, format: uri, maxLength: 255 }
+        is_active: { type: boolean }
+    TestCapture:
+      type: object
+      required: [image_url, captured_at, latency_ms]
+      properties:
+        image_url: { type: string, format: uri, description: URL ký sẵn, hết hạn sau 10 phút }
+        captured_at: { type: string, format: date-time }
+        latency_ms: { type: integer }
+    ShiftOpen:
+      type: object
+      required: [counter_id, opening_cash_vnd]
+      properties:
+        counter_id: { type: integer, format: int64 }
+        opening_cash_vnd: { type: integer, format: int64, minimum: 0 }
+    ShiftClose:
+      type: object
+      required: [counted_cash_vnd]
+      properties:
+        counted_cash_vnd: { type: integer, format: int64, minimum: 0 }
+    Shift:
+      type: object
+      required: [id, counter, cashier, opened_at, opening_cash_vnd, closed_at, counted_cash_vnd]
+      properties:
+        id: { type: integer, format: int64 }
+        counter: { $ref: '#/components/schemas/CounterRef' }
+        cashier: { $ref: '#/components/schemas/UserRef' }
+        opened_at: { type: string, format: date-time }
+        opening_cash_vnd: { type: integer, format: int64 }
+        closed_at: { type: [string, 'null'], format: date-time }
+        counted_cash_vnd: { type: [integer, 'null'], format: int64 }
+    CurrentShift:
+      type: object
+      required: [shift, open_transaction_id]
+      properties:
+        shift: { $ref: '#/components/schemas/Shift' }
+        open_transaction_id: { type: [integer, 'null'], format: int64 }
+    ShiftSummary:
+      type: object
+      required: [shift, transactions, revenue_vnd, expected_cash_vnd, difference_vnd, alerts]
+      properties:
+        shift: { $ref: '#/components/schemas/Shift' }
+        transactions: { type: integer, description: Giao dịch đã thanh toán }
+        cancelled: { type: integer }
+        revenue_vnd: { type: integer, format: int64 }
+        expected_cash_vnd: { type: integer, format: int64, description: Tiền đầu ca + tiền mặt thu − tiền thối }
+        difference_vnd:
+          type: [integer, 'null']
+          format: int64
+          description: Thực đếm − dự kiến; null khi ca chưa đóng
+        alerts:
+          type: object
+          description: Số cảnh báo mức Cao/Trung bình theo cách xử lý
+          required: [scanned, false_alarm, open]
+          properties:
+            scanned: { type: integer }
+            false_alarm: { type: integer }
+            open: { type: integer }
+
+    # -------------------------------------------------------------- checkout
+    TransactionCreate:
+      type: object
+      required: [mode]
+      properties:
+        mode: { $ref: '#/components/schemas/CheckoutMode' }
+    TransactionUpdate:
+      type: object
+      required: [mode]
+      properties:
+        mode: { $ref: '#/components/schemas/CheckoutMode' }
+    ScanRequest:
+      type: object
+      required: [barcode]
+      properties:
+        barcode: { type: string, pattern: '^[0-9]{8,14}$' }
+        qty: { type: integer, minimum: 1, maximum: 99, default: 1 }
+        detection_id:
+          type: integer
+          format: int64
+          description: Làn nhanh — box màu cam mà lần quét này xác nhận
+    PayRequest:
+      type: object
+      required: [payment_method]
+      properties:
+        payment_method: { $ref: '#/components/schemas/PaymentMethod' }
+        cash_received_vnd:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Bắt buộc khi `CASH`, phải ≥ tổng tiền
+        confirmed_all_scanned:
+          type: boolean
+          default: false
+          description: Làn nhanh — thu ngân tích "đã quét hết món ngoài vùng nhận diện" (US10); bắt buộc true ở chế độ FAST
+    ManagerApprovalRequest:
+      type: object
+      required: [pin, reason]
+      properties:
+        pin: { type: string, pattern: '^[0-9]{6}$', writeOnly: true }
+        reason: { type: string, minLength: 3, maxLength: 200 }
+    TransactionLine:
+      type: object
+      required: [id, sku, qty, unit_price_vnd, amount_vnd, source, detection_id, added_at]
+      properties:
+        id: { type: integer, format: int64 }
+        sku: { $ref: '#/components/schemas/SkuRef' }
+        qty: { type: integer, minimum: 1 }
+        unit_price_vnd: { type: integer, format: int64, description: Giá lúc bán }
+        amount_vnd: { type: integer, format: int64 }
+        source: { $ref: '#/components/schemas/LineSource' }
+        detection_id: { type: [integer, 'null'], format: int64, description: Box mà camera thêm dòng này (làn nhanh) }
+        added_at: { type: string, format: date-time }
+    RemovedLine:
+      allOf:
+        - { $ref: '#/components/schemas/TransactionLine' }
+        - type: object
+          required: [removed_at, removed_by, removal_reason]
+          properties:
+            removed_at: { type: string, format: date-time }
+            removed_by: { $ref: '#/components/schemas/UserRef' }
+            removal_reason: { $ref: '#/components/schemas/RemovalReason' }
+    Detection:
+      type: object
+      required: [id, sku, score, box, state, confirmed_sku_id]
+      properties:
+        id: { type: integer, format: int64 }
+        sku: { $ref: '#/components/schemas/SkuRef' }
+        score: { type: number, minimum: 0, maximum: 1 }
+        box: { $ref: '#/components/schemas/Box' }
+        state: { $ref: '#/components/schemas/DetectionState' }
+        order_no:
+          type: integer
+          description: Số thứ tự trên box cam (làn nhanh)
+        confirmed_sku_id:
+          type: [integer, 'null']
+          format: int64
+          description: SKU đã quét để xác nhận; khác `sku.id` nghĩa là model đoán sai (bản sửa)
+    TrayCapture:
+      type: object
+      required: [id, status, captured_at, latency_ms, model_version, image_url, error, detections]
+      properties:
+        id: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/CaptureStatus' }
+        captured_at: { type: string, format: date-time }
+        latency_ms: { type: [integer, 'null'] }
+        model_version:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/ModelVersionRef' }
+        image_url:
+          type: [string, 'null']
+          format: uri
+          description: URL ký sẵn, hết hạn sau 10 phút; null khi lỗi hoặc ảnh đã xóa theo BR-13
+        error: { type: [string, 'null'] }
+        detections:
+          type: array
+          items: { $ref: '#/components/schemas/Detection' }
+    AlertReview:
+      type: object
+      required: [result, note, reviewed_by, reviewed_at]
+      properties:
+        result: { $ref: '#/components/schemas/ReviewResult' }
+        note: { type: [string, 'null'] }
+        reviewed_by: { $ref: '#/components/schemas/UserRef' }
+        reviewed_at: { type: string, format: date-time }
+    Alert:
+      type: object
+      required: [id, capture_id, type, severity, seen_sku, scanned_sku, qty, value_vnd, resolution, reason, resolved_by, resolved_at, detection_ids, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        capture_id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/AlertType' }
+        severity: { $ref: '#/components/schemas/AlertSeverity' }
+        seen_sku:
+          description: SKU camera thấy
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/SkuRef' }
+        scanned_sku:
+          description: SKU đã quét
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/SkuRef' }
+        qty: { type: integer, minimum: 1 }
+        value_vnd: { type: integer, format: int64, description: Số tiền cửa hàng có thể mất }
+        resolution: { $ref: '#/components/schemas/AlertResolution' }
+        reason: { type: [string, 'null'], description: Lý do báo nhầm của thu ngân }
+        resolved_by:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/UserRef' }
+        resolved_at: { type: [string, 'null'], format: date-time }
+        detection_ids:
+          type: array
+          description: Box gây cảnh báo, để làm nổi trên ảnh
+          items: { type: integer, format: int64 }
+        review:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/AlertReview' }
+        created_at: { type: string, format: date-time }
+    ManagerApproval:
+      type: object
+      required: [id, action, manager, reason, approved_at]
+      properties:
+        id: { type: integer, format: int64 }
+        action: { $ref: '#/components/schemas/ApprovalAction' }
+        manager: { $ref: '#/components/schemas/UserRef' }
+        reason: { type: string }
+        approved_at: { type: string, format: date-time }
+    Payment:
+      type: object
+      required: [payment_method, total_vnd, cash_received_vnd, change_vnd, paid_at]
+      properties:
+        payment_method: { $ref: '#/components/schemas/PaymentMethod' }
+        total_vnd: { type: integer, format: int64 }
+        cash_received_vnd: { type: [integer, 'null'], format: int64 }
+        change_vnd: { type: [integer, 'null'], format: int64 }
+        paid_at: { type: string, format: date-time }
+    Checkout:
+      type: object
+      description: Một giao dịch và mọi thứ màn quầy cần để vẽ lại sau mỗi thao tác.
+      required:
+        - id
+        - code
+        - mode
+        - status
+        - shift_id
+        - counter
+        - cashier
+        - started_at
+        - closed_at
+        - lines
+        - removed_lines
+        - subtotal_vnd
+        - latest_capture
+        - alerts
+        - reconciled
+        - failed_captures_in_row
+        - tray_check_skipped
+        - approvals
+        - pay_blockers
+        - payment
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string, examples: [GD1042] }
+        mode: { $ref: '#/components/schemas/CheckoutMode' }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+        shift_id: { type: integer, format: int64 }
+        counter: { $ref: '#/components/schemas/CounterRef' }
+        cashier: { $ref: '#/components/schemas/UserRef' }
+        started_at: { type: string, format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/TransactionLine' }
+        removed_lines:
+          type: array
+          items: { $ref: '#/components/schemas/RemovedLine' }
+        subtotal_vnd: { type: integer, format: int64, description: Tổng các dòng chưa xóa }
+        latest_capture:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/TrayCapture' }
+        alerts:
+          type: array
+          description: Cảnh báo của lần chụp gần nhất (lần chụp trước không còn hiệu lực)
+          items: { $ref: '#/components/schemas/Alert' }
+        reconciled: { type: boolean, description: Đã đối chiếu (bấm Thanh toán ở Kiểm tra chéo). Trước đó `alerts` rỗng }
+        failed_captures_in_row: { type: integer, description: Đủ 2 thì hiện nút bỏ qua kiểm tra (cần PIN) }
+        tray_check_skipped: { type: boolean }
+        approvals:
+          type: array
+          items: { $ref: '#/components/schemas/ManagerApproval' }
+        pay_blockers:
+          type: array
+          description: Rỗng nghĩa là thanh toán được
+          items: { $ref: '#/components/schemas/PayBlocker' }
+        payment:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/Payment' }
+    TransactionSummary:
+      type: object
+      required: [id, code, mode, status, counter, cashier, total_vnd, item_count, alert_count, false_alarm_count, started_at, closed_at]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        mode: { $ref: '#/components/schemas/CheckoutMode' }
+        status: { $ref: '#/components/schemas/TransactionStatus' }
+        counter: { $ref: '#/components/schemas/CounterRef' }
+        cashier: { $ref: '#/components/schemas/UserRef' }
+        total_vnd: { type: [integer, 'null'], format: int64 }
+        item_count: { type: integer }
+        alert_count: { type: integer, description: Cảnh báo mức Cao và Trung bình }
+        false_alarm_count: { type: integer }
+        started_at: { type: string, format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time }
+    TransactionPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/TransactionSummary' }
+
+    # -------------------------------------------------------------- alerts and review
+    FalseAlarmRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 200, examples: [Khay chỉ có 1 chai, camera đếm 2] }
+    ReviewRequest:
+      type: object
+      required: [result]
+      properties:
+        result: { $ref: '#/components/schemas/ReviewResult' }
+        note: { type: string, maxLength: 500 }
+    AlertListItem:
+      allOf:
+        - { $ref: '#/components/schemas/Alert' }
+        - type: object
+          required: [transaction, cashier, counter]
+          properties:
+            transaction:
+              type: object
+              required: [id, code]
+              properties:
+                id: { type: integer, format: int64 }
+                code: { type: string }
+            cashier: { $ref: '#/components/schemas/UserRef' }
+            counter: { $ref: '#/components/schemas/CounterRef' }
+    AlertPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items, summary]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/AlertListItem' }
+            summary:
+              type: object
+              description: Thẻ tóm tắt M02, tính trên bộ lọc thời gian
+              required: [total, scanned, false_alarm, false_alarm_rate, to_review, to_review_first]
+              properties:
+                total: { type: integer }
+                scanned: { type: integer }
+                false_alarm: { type: integer }
+                false_alarm_rate: { type: number, minimum: 0, maximum: 1 }
+                to_review: { type: integer }
+                to_review_first: { type: integer, description: Có ít nhất một lý do ưu tiên BR-17 }
+    ReviewQueueItem:
+      type: object
+      required: [alert_id, transaction_id, transaction_code, cashier, type, seen_sku, scanned_sku, value_vnd, reason, resolved_at, reasons, priority]
+      properties:
+        alert_id: { type: integer, format: int64 }
+        transaction_id: { type: integer, format: int64 }
+        transaction_code: { type: string }
+        cashier: { $ref: '#/components/schemas/UserRef' }
+        type: { $ref: '#/components/schemas/AlertType' }
+        seen_sku:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/SkuRef' }
+        scanned_sku:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/SkuRef' }
+        value_vnd: { type: integer, format: int64 }
+        reason: { type: string }
+        resolved_at: { type: string, format: date-time }
+        reasons:
+          type: array
+          description: Vì sao xem trước; rỗng nghĩa là không ưu tiên
+          items: { $ref: '#/components/schemas/ReviewPriorityReason' }
+        priority: { type: integer, minimum: 0, maximum: 3 }
+    ReviewQueuePage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ReviewQueueItem' }
+
+    # -------------------------------------------------------------- catalog
+    Category:
+      type: object
+      required: [id, code, name]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string, examples: [puffed_food] }
+        name: { type: string }
+    Sku:
+      type: object
+      required: [id, barcode, name, category, price_vnd, is_selling, learn_status, batch]
+      properties:
+        id: { type: integer, format: int64 }
+        barcode: { type: string }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        price_vnd: { type: integer, format: int64 }
+        is_selling: { type: boolean }
+        learn_status: { $ref: '#/components/schemas/LearnStatus' }
+        batch:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/BatchRef' }
+    SkuDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Sku' }
+        - type: object
+          required: [confused_with, accepted_cutouts]
+          properties:
+            confused_with:
+              type: array
+              description: Top SKU hay bị nhầm trên val của phiên bản đang chạy
+              items:
+                type: object
+                required: [sku, count]
+                properties:
+                  sku: { $ref: '#/components/schemas/SkuRef' }
+                  count: { type: integer }
+            accepted_cutouts:
+              type: array
+              items: { type: string, format: uri }
+    SkuPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items, summary]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Sku' }
+            summary:
+              type: object
+              description: Thẻ tóm tắt M05, không phụ thuộc bộ lọc
+              required: [selling, learned, learning, not_learned]
+              properties:
+                selling: { type: integer }
+                learned: { type: integer }
+                learning: { type: integer }
+                not_learned: { type: integer }
+    SkuCreate:
+      type: object
+      required: [barcode, name, category_id, price_vnd]
+      properties:
+        barcode: { type: string, pattern: '^[0-9]{8,14}$' }
+        name: { type: string, minLength: 1, maxLength: 150 }
+        category_id: { type: integer, format: int64 }
+        price_vnd: { type: integer, format: int64, minimum: 1 }
+    SkuUpdate:
+      type: object
+      minProperties: 1
+      description: Mã vạch không đổi được sau khi tạo
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        category_id: { type: integer, format: int64 }
+        price_vnd: { type: integer, format: int64, minimum: 1 }
+        is_selling: { type: boolean }
+    SkuImportResult:
+      type: object
+      required: [dry_run, created, errors]
+      properties:
+        dry_run: { type: boolean }
+        created: { type: integer }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [row, message]
+            properties:
+              row: { type: integer, description: Số dòng trong file, tính cả dòng tiêu đề }
+              field: { type: string }
+              message: { type: string }
+
+    # -------------------------------------------------------------- batches
+    Batch:
+      type: object
+      required: [id, seq_no, name, status, sku_count, created_by, created_at, deployed_at]
+      properties:
+        id: { type: integer, format: int64 }
+        seq_no: { type: integer }
+        name: { type: string }
+        status: { $ref: '#/components/schemas/BatchStatus' }
+        sku_count: { type: integer }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        deployed_at: { type: [string, 'null'], format: date-time }
+    BatchCreate:
+      type: object
+      required: [name, sku_ids]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        sku_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: integer, format: int64 }
+    BatchReadiness:
+      type: object
+      description: Điều kiện BR-11 (view `v_batch_readiness`); mục tiêu lấy từ `settings`
+      required: [ready, sku_count, skus_with_samples, skus_with_val_boxes, val_images, has_composites, targets, unmet]
+      properties:
+        ready: { type: boolean }
+        sku_count: { type: integer }
+        skus_with_samples: { type: integer }
+        skus_with_val_boxes: { type: integer }
+        val_images: { type: integer }
+        has_composites: { type: boolean }
+        targets:
+          type: object
+          required: [min_cutouts, min_val_images, min_val_boxes]
+          properties:
+            min_cutouts: { type: integer, examples: [8] }
+            min_val_images: { type: integer, examples: [50] }
+            min_val_boxes: { type: integer, examples: [20] }
+        unmet:
+          type: array
+          items: { $ref: '#/components/schemas/ReadinessCondition' }
+    BatchSkuProgress:
+      type: object
+      required: [sku, accepted_cutouts, pending_cutouts, val_boxes]
+      properties:
+        sku: { $ref: '#/components/schemas/SkuRef' }
+        accepted_cutouts: { type: integer }
+        pending_cutouts: { type: integer }
+        val_boxes: { type: integer }
+    BatchDetail:
+      allOf:
+        - { $ref: '#/components/schemas/Batch' }
+        - type: object
+          required: [timeline, readiness, skus, label_queue, jobs, model_versions]
+          properties:
+            timeline:
+              type: array
+              description: 5 bước của US16; `reached_at` null là chưa tới
+              items:
+                type: object
+                required: [status, reached_at]
+                properties:
+                  status: { $ref: '#/components/schemas/BatchStatus' }
+                  reached_at: { type: [string, 'null'], format: date-time }
+            readiness: { $ref: '#/components/schemas/BatchReadiness' }
+            skus:
+              type: array
+              items: { $ref: '#/components/schemas/BatchSkuProgress' }
+            label_queue:
+              type: object
+              required: [pending, labeled, skipped]
+              properties:
+                pending: { type: integer }
+                labeled: { type: integer }
+                skipped: { type: integer }
+            jobs:
+              type: array
+              items: { $ref: '#/components/schemas/Job' }
+            model_versions:
+              type: array
+              items: { $ref: '#/components/schemas/ModelVersion' }
+    SkuSample:
+      type: object
+      required: [id, sku_id, photo_url, cutout_url, mask_quality, needs_attention, status, uploaded_at, reviewed_at]
+      properties:
+        id: { type: integer, format: int64 }
+        sku_id: { type: integer, format: int64 }
+        photo_url: { type: string, format: uri }
+        cutout_url: { type: [string, 'null'], format: uri, description: Null khi đang cắt nền }
+        mask_quality: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        needs_attention: { type: boolean, description: Điểm cắt nền thấp, hiện "Cần xem kỹ" }
+        status: { $ref: '#/components/schemas/SampleStatus' }
+        uploaded_at: { type: string, format: date-time }
+        reviewed_at: { type: [string, 'null'], format: date-time }
+    SampleReview:
+      type: object
+      required: [sample_ids, status]
+      properties:
+        sample_ids:
+          type: array
+          minItems: 1
+          maxItems: 200
+          uniqueItems: true
+          items: { type: integer, format: int64 }
+        status:
+          type: string
+          enum: [ACCEPTED, REJECTED]
+    CompositeRequest:
+      type: object
+      properties:
+        images: { type: integer, minimum: 100, maximum: 20000, default: 2000, description: Số ảnh ghép cần tạo }
+    TrainingRequest:
+      type: object
+      properties:
+        epochs: { type: integer, minimum: 1, maximum: 100, default: 16 }
+        mix_real_images:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Số ảnh thật vượt mức BR-11 trộn vào huấn luyện (BR-16); 0 là không trộn
+
+    # -------------------------------------------------------------- labeling
+    LabelTaskSummary:
+      type: object
+      required: [id, batch_id, source, status, split, queued_at, completed_at, skip_reason]
+      properties:
+        id: { type: integer, format: int64 }
+        batch_id: { type: [integer, 'null'], format: int64, description: Null là ảnh khó chờ đợt sau }
+        source: { $ref: '#/components/schemas/LabelSource' }
+        status: { $ref: '#/components/schemas/LabelStatus' }
+        split:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/DatasetSplit' }
+        queued_at: { type: string, format: date-time }
+        completed_at: { type: [string, 'null'], format: date-time }
+        skip_reason: { type: [string, 'null'] }
+    LabelTaskPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/LabelTaskSummary' }
+    Proposal:
+      type: object
+      description: Box hàng cũ do model đề xuất, lấy từ lần nhận diện tại quầy của ảnh này
+      required: [detection_id, sku, score, box]
+      properties:
+        detection_id: { type: integer, format: int64 }
+        sku: { $ref: '#/components/schemas/SkuRef' }
+        score: { type: number, minimum: 0, maximum: 1 }
+        box: { $ref: '#/components/schemas/Box' }
+    Annotation:
+      type: object
+      required: [id, sku, box, origin, proposal_score]
+      properties:
+        id: { type: integer, format: int64 }
+        sku: { $ref: '#/components/schemas/SkuRef' }
+        box: { $ref: '#/components/schemas/Box' }
+        origin: { $ref: '#/components/schemas/AnnotationOrigin' }
+        proposal_score: { type: [number, 'null'] }
+    LabelTask:
+      allOf:
+        - { $ref: '#/components/schemas/LabelTaskSummary' }
+        - type: object
+          required: [image_url, position, proposals, expected_new_skus, annotations]
+          properties:
+            image_url: { type: string, format: uri }
+            position:
+              type: object
+              description: Ảnh x/y trong hàng đợi của đợt
+              required: [index, total]
+              properties:
+                index: { type: integer, minimum: 1 }
+                total: { type: integer }
+            proposals:
+              type: array
+              items: { $ref: '#/components/schemas/Proposal' }
+            expected_new_skus:
+              type: array
+              description: Hàng mới trong khay theo mã vạch đã quét, kèm số lượng cần vẽ
+              items:
+                type: object
+                required: [sku, qty]
+                properties:
+                  sku: { $ref: '#/components/schemas/SkuRef' }
+                  qty: { type: integer, minimum: 1 }
+            annotations:
+              type: array
+              description: Nhãn đã lưu; rỗng khi ảnh còn PENDING
+              items: { $ref: '#/components/schemas/Annotation' }
+    LabelSubmit:
+      type: object
+      required: [accepted_proposal_ids, rejected_proposal_ids, manual_boxes]
+      properties:
+        accepted_proposal_ids:
+          type: array
+          uniqueItems: true
+          items: { type: integer, format: int64 }
+        rejected_proposal_ids:
+          type: array
+          uniqueItems: true
+          description: Gồm cả đề xuất bị thay bằng box vẽ tay
+          items: { type: integer, format: int64 }
+        manual_boxes:
+          type: array
+          items:
+            type: object
+            required: [sku_id, box]
+            properties:
+              sku_id: { type: integer, format: int64 }
+              box: { $ref: '#/components/schemas/Box' }
+        acknowledge_count_mismatch: { type: boolean, default: false }
+    HardImageRequest:
+      type: object
+      required: [capture_id]
+      properties:
+        capture_id: { type: integer, format: int64 }
+        note: { type: string, maxLength: 200 }
+
+    # -------------------------------------------------------------- jobs and models
+    Job:
+      type: object
+      required: [id, type, batch_id, status, progress, progress_total, params, output_count, gpu_hours, error, created_by, created_at, started_at, finished_at]
+      properties:
+        id: { type: integer, format: int64 }
+        type: { $ref: '#/components/schemas/JobType' }
+        batch_id: { type: integer, format: int64 }
+        status: { $ref: '#/components/schemas/JobStatus' }
+        progress: { type: integer, minimum: 0 }
+        progress_total: { type: integer, description: Epoch khi huấn luyện, số ảnh khi ghép }
+        params:
+          type: object
+          additionalProperties: true
+          examples: [{ epochs: 16, mix_real_images: 0 }]
+        output_count: { type: [integer, 'null'], description: Số ảnh ghép đã tạo }
+        gpu_hours: { type: number, minimum: 0 }
+        error: { type: [string, 'null'] }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        started_at: { type: [string, 'null'], format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    JobPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Job' }
+    ModelMetrics:
+      type: object
+      description: Phần trăm, đo trên tập kiểm tra ảnh thật (BR-09)
+      required: [ap50, cacc, forgetting, miss_recall, false_alarm_rate, swap_recall]
+      properties:
+        ap50: { type: number, minimum: 0, maximum: 100 }
+        cacc: { type: number, minimum: 0, maximum: 100, description: Chỉ để tham khảo }
+        forgetting: { type: number, description: Mức quên trung bình trên các đợt trước, điểm }
+        miss_recall: { type: number, minimum: 0, maximum: 100 }
+        false_alarm_rate: { type: number, minimum: 0, maximum: 100 }
+        swap_recall: { type: number, minimum: 0, maximum: 100 }
+    ModelVersion:
+      type: object
+      required: [id, code, name, batch, status, backbone, sku_count, metrics, gate_passed, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        code: { type: string }
+        name: { type: string }
+        batch: { $ref: '#/components/schemas/BatchRef' }
+        status: { $ref: '#/components/schemas/ModelStatus' }
+        backbone: { type: string }
+        sku_count: { type: integer }
+        metrics: { $ref: '#/components/schemas/ModelMetrics' }
+        gate_passed: { type: boolean }
+        created_at: { type: string, format: date-time }
+    GateCheck:
+      type: object
+      required: [key, value, baseline, limit, passed]
+      properties:
+        key:
+          type: string
+          enum: [AP50_DROP, FORGETTING, MISS_RECALL, FALSE_ALARM_RATE]
+        value: { type: number }
+        baseline: { type: [number, 'null'], description: Giá trị của bản đang chạy; null với bản đầu tiên }
+        limit: { type: number, description: Từ `settings` gate.* lúc đánh giá }
+        passed: { type: boolean }
+    ModelVersionDetail:
+      allOf:
+        - { $ref: '#/components/schemas/ModelVersion' }
+        - type: object
+          required: [gate_report, confusions, train_job_id, gpu_hours, rejected, deployments]
+          properties:
+            gate_report:
+              type: array
+              items: { $ref: '#/components/schemas/GateCheck' }
+            confusions:
+              type: array
+              description: Top cặp SKU nhầm trên val
+              items:
+                type: object
+                required: [true_sku, predicted_sku, count]
+                properties:
+                  true_sku: { $ref: '#/components/schemas/SkuRef' }
+                  predicted_sku: { $ref: '#/components/schemas/SkuRef' }
+                  count: { type: integer }
+            train_job_id: { type: integer, format: int64 }
+            gpu_hours: { type: number }
+            rejected:
+              oneOf:
+                - type: 'null'
+                - type: object
+                  required: [by, at, reason]
+                  properties:
+                    by: { $ref: '#/components/schemas/UserRef' }
+                    at: { type: string, format: date-time }
+                    reason: { type: string }
+            deployments:
+              type: array
+              items: { $ref: '#/components/schemas/Deployment' }
+    DeployRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 300
+          description: Bắt buộc khi phiên bản không đạt cổng duyệt
+    Deployment:
+      type: object
+      required: [id, action, model_version, previous_version, gate_overridden, reason, performed_by, performed_at]
+      properties:
+        id: { type: integer, format: int64 }
+        action: { $ref: '#/components/schemas/DeploymentAction' }
+        model_version: { $ref: '#/components/schemas/ModelVersionRef' }
+        previous_version:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/ModelVersionRef' }
+        gate_overridden: { type: boolean }
+        reason: { type: [string, 'null'] }
+        performed_by: { $ref: '#/components/schemas/UserRef' }
+        performed_at: { type: string, format: date-time }
+
+    # -------------------------------------------------------------- thresholds
+    ThresholdInput:
+      type: object
+      description: Phải thỏa 0 ≤ low < alert ≤ auto ≤ 1
+      required: [batch_id, low_threshold, alert_threshold, auto_threshold]
+      properties:
+        batch_id: { type: integer, format: int64 }
+        low_threshold: { type: number, minimum: 0, maximum: 1 }
+        alert_threshold: { type: number, minimum: 0, maximum: 1 }
+        auto_threshold: { type: number, minimum: 0, maximum: 1 }
+    ThresholdConfig:
+      type: object
+      required: [id, batch, low_threshold, alert_threshold, auto_threshold, created_by, created_at]
+      properties:
+        id: { type: integer, format: int64 }
+        batch: { $ref: '#/components/schemas/BatchRef' }
+        low_threshold: { type: number }
+        alert_threshold: { type: number }
+        auto_threshold: { type: number }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+    ThresholdMetrics:
+      type: object
+      required: [miss_recall, false_alarm_rate, auto_add_rate]
+      properties:
+        miss_recall: { type: number, minimum: 0, maximum: 100 }
+        false_alarm_rate: { type: number, minimum: 0, maximum: 100 }
+        auto_add_rate: { type: number, minimum: 0, maximum: 100, description: '% món làn nhanh tự thêm' }
+    ThresholdPreview:
+      type: object
+      required: [current, proposed]
+      properties:
+        current: { $ref: '#/components/schemas/ThresholdMetrics' }
+        proposed: { $ref: '#/components/schemas/ThresholdMetrics' }
+
+    # -------------------------------------------------------------- reports
+    Dashboard:
+      type: object
+      required: [revenue_vnd, transactions, caught_unscanned_value_vnd, alerted_tray_rate, false_alarm_rate, sku_coverage, daily_alerts, active_model, active_batches, review_top]
+      properties:
+        revenue_vnd: { type: integer, format: int64 }
+        transactions: { type: integer }
+        caught_unscanned_value_vnd: { type: integer, format: int64, description: Giá trị món chưa quét đã phát hiện và được quét bổ sung }
+        alerted_tray_rate: { type: number, minimum: 0, maximum: 1 }
+        false_alarm_rate: { type: number, minimum: 0, maximum: 1 }
+        sku_coverage:
+          type: object
+          required: [learned, selling]
+          properties:
+            learned: { type: integer }
+            selling: { type: integer }
+        daily_alerts:
+          type: array
+          items:
+            type: object
+            required: [date, unscanned_item, suspected_swap, false_alarm]
+            properties:
+              date: { type: string, format: date }
+              unscanned_item: { type: integer }
+              suspected_swap: { type: integer }
+              false_alarm: { type: integer }
+        active_model:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/ModelVersionRef' }
+        active_batches:
+          type: array
+          items: { $ref: '#/components/schemas/Batch' }
+        review_top:
+          type: array
+          maxItems: 5
+          items: { $ref: '#/components/schemas/ReviewQueueItem' }
+    CashierStats:
+      type: object
+      required: [cashier, alerts, false_alarms, false_alarm_rate, false_alarm_anomalous, transactions, removed_lines, removed_value_vnd, removals_per_transaction, removal_anomalous]
+      properties:
+        cashier: { $ref: '#/components/schemas/UserRef' }
+        alerts: { type: integer }
+        false_alarms: { type: integer }
+        false_alarm_rate: { type: number, minimum: 0, maximum: 1 }
+        false_alarm_anomalous: { type: boolean }
+        transactions: { type: integer }
+        removed_lines: { type: integer }
+        removed_value_vnd: { type: integer, format: int64 }
+        removals_per_transaction: { type: number, minimum: 0 }
+        removal_anomalous: { type: boolean }
+    CashierStatsReport:
+      type: object
+      required: [window_days, store_false_alarm_rate, store_removals_per_transaction, items]
+      properties:
+        window_days: { type: integer }
+        store_false_alarm_rate: { type: number }
+        store_removals_per_transaction: { type: number }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CashierStats' }
+    Monitoring:
+      type: object
+      required: [latency_p50_ms, latency_p95_ms, alerted_tray_rate, false_alarm_rate, auto_add_rate, daily, confusions, false_alarm_pairs]
+      properties:
+        latency_p50_ms: { type: [integer, 'null'] }
+        latency_p95_ms: { type: [integer, 'null'] }
+        alerted_tray_rate: { type: number }
+        false_alarm_rate: { type: number }
+        auto_add_rate: { type: number }
+        daily:
+          type: array
+          items:
+            type: object
+            required: [date, alerted_tray_rate, false_alarm_rate, latency_p95_ms]
+            properties:
+              date: { type: string, format: date }
+              alerted_tray_rate: { type: number }
+              false_alarm_rate: { type: number }
+              latency_p95_ms: { type: [integer, 'null'] }
+        confusions:
+          type: array
+          description: Cặp hay nhầm trên val của phiên bản đang chạy
+          items:
+            type: object
+            required: [true_sku, predicted_sku, count]
+            properties:
+              true_sku: { $ref: '#/components/schemas/SkuRef' }
+              predicted_sku: { $ref: '#/components/schemas/SkuRef' }
+              count: { type: integer }
+        false_alarm_pairs:
+          type: array
+          description: Báo nhầm tại quầy theo cặp SKU (view `v_false_alarm_pairs`); nhiều thu ngân cùng cặp là lỗi model
+          items:
+            type: object
+            required: [seen_sku, scanned_sku, false_alarms, cashiers, last_at, latest_capture_id]
+            properties:
+              seen_sku:
+                oneOf:
+                  - type: 'null'
+                  - { $ref: '#/components/schemas/SkuRef' }
+              scanned_sku:
+                oneOf:
+                  - type: 'null'
+                  - { $ref: '#/components/schemas/SkuRef' }
+              false_alarms: { type: integer }
+              cashiers: { type: integer }
+              last_at: { type: string, format: date-time }
+              latest_capture_id: { type: integer, format: int64, description: Để gửi vào hàng đợi ảnh khó }
+
+    # -------------------------------------------------------------- system
+    AuditLog:
+      type: object
+      required: [id, occurred_at, actor, action, entity_type, entity_id, counter, detail]
+      properties:
+        id: { type: integer, format: int64 }
+        occurred_at: { type: string, format: date-time }
+        actor:
+          description: Null là hệ thống
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/UserRef' }
+        action: { type: string, examples: [DELETE_LINE] }
+        entity_type: { type: [string, 'null'] }
+        entity_id: { type: [integer, 'null'], format: int64 }
+        counter:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/CounterRef' }
+        detail: { type: object, additionalProperties: true }
+    AuditLogPage:
+      allOf:
+        - { $ref: '#/components/schemas/PageMeta' }
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/AuditLog' }
+    Setting:
+      type: object
+      required: [key, value, description, updated_by, updated_at]
+      properties:
+        key: { type: string, examples: [retention.transaction_days] }
+        value: { description: Giá trị JSON (số, chuỗi, bool) }
+        description: { type: string }
+        updated_by:
+          oneOf:
+            - type: 'null'
+            - { $ref: '#/components/schemas/UserRef' }
+        updated_at: { type: string, format: date-time }
+    SettingsUpdate:
+      type: object
+      minProperties: 1
+      description: Khóa → giá trị mới
+      additionalProperties: true
+    StorageUsage:
+      type: object
+      required: [total_bytes, groups]
+      properties:
+        total_bytes: { type: integer, format: int64 }
+        groups:
+          type: array
+          items:
+            type: object
+            required: [name, bytes, objects]
+            properties:
+              name:
+                type: string
+                enum: [TRAY_IMAGES, SAMPLE_PHOTOS, DATASETS, CHECKPOINTS]
+              bytes: { type: integer, format: int64 }
+              objects: { type: integer }
+    Health:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [ok, down]
+          examples: [{ database: ok, redis: ok, storage: ok, inference: down }]

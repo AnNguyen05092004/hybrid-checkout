@@ -19,7 +19,7 @@ export function SettingsPage() {
               <span className="small faint">Dùng cho hậu kiểm. Hết hạn thì xóa ảnh, giữ lại kết quả đối chiếu.</span></label>
             <label className="field"><span>Ảnh của đợt nhập, tính từ khi deploy (ngày)</span>
               <input className="input" type="number" min={0} value={draft.batchDays} onChange={(e) => setDraft({ ...draft, batchDays: Number(e.target.value) })} />
-              <span className="small faint">Model học thêm không cần ảnh cũ, nên ảnh đợt được xóa sau thời gian theo dõi.</span></label>
+              <span className="small faint">Model học thêm không cần ảnh huấn luyện cũ, nên ảnh mẫu và ảnh huấn luyện của đợt được xóa sau thời gian theo dõi. Tập kiểm tra ảnh thật được giữ để duyệt các phiên bản sau.</span></label>
           </div>
         </Card>
         <Card title="Dung lượng">

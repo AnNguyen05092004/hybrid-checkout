@@ -145,7 +145,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | Báo nhầm nhiều, thu ngân bỏ qua cảnh báo | Chỉ cảnh báo khi đủ tự tin; chỉnh ngưỡng theo nhóm; theo dõi tỉ lệ báo nhầm |
 | SKU giống nhau bị nhầm, báo tráo mã sai | Hiện ảnh vùng nghi ngờ; hạ mức cảnh báo cho cặp hay nhầm |
 | Thu ngân lạm dụng "báo nhầm" | Mọi báo nhầm lưu ảnh, lý do, người; hậu kiểm ưu tiên món giá trị cao và thu ngân có tỉ lệ báo nhầm bất thường so với cửa hàng |
-| Chờ quản lý làm tắc quầy | Thu ngân tự xác nhận báo nhầm, không cần PIN; PIN chỉ cho xóa dòng, hủy giao dịch, bỏ qua kiểm tra |
+| Chờ quản lý làm tắc quầy | Thu ngân tự xác nhận báo nhầm và tự xóa dòng kèm lý do, không cần PIN, hậu kiểm sau; PIN chỉ cho hủy giao dịch, bỏ qua kiểm tra |
 | Model báo nhầm lặp lại | Thống kê báo nhầm theo cặp SKU; đưa ảnh vào hàng đợi ảnh khó để cải thiện model đợt sau |
 | Deploy model kém hơn | Cổng duyệt và rollback một bước |
 | Model tốt trên ảnh ghép nhưng kém ở quầy | Cổng duyệt chỉ đo trên ảnh thật; ảnh khó từ quầy đưa vào hàng đợi gán nhãn đợt sau |

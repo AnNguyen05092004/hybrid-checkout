@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../../app/store";
-import { Badge, Card, Empty, PageHeader } from "../../components/ui";
+import { Badge, Card, Empty, PageHeader, useShowMore } from "../../components/ui";
 import { dateTime, money } from "../../lib/format";
 
 /** M04 — Transactions. */
@@ -13,6 +13,8 @@ export function TransactionsPage() {
   const [onlyAlerts, setOnlyAlerts] = useState(false);
   const rows = transactions.filter((t) =>
     (counter === "ALL" || t.counterId === counter) && (mode === "ALL" || t.mode === mode) && (!onlyAlerts || t.alerts.some((a) => a.severity !== "LOW")));
+
+  const [shown, more] = useShowMore(rows);
 
   return (
     <>
@@ -29,7 +31,7 @@ export function TransactionsPage() {
         {rows.length === 0 ? <Empty title="Không có giao dịch khớp bộ lọc" /> : (
           <div className="table-wrap"><table className="table">
             <thead><tr><th>Mã</th><th>Thời gian</th><th>Quầy</th><th>Thu ngân</th><th>Chế độ</th><th className="num">Số món</th><th className="num">Tổng</th><th>Cảnh báo</th><th>Model</th><th>Trạng thái</th></tr></thead>
-            <tbody>{rows.map((t) => (
+            <tbody>{shown.map((t) => (
               <tr key={t.id} className="clickable" onClick={() => navigate(`/transactions/${t.id}`)}>
                 <td className="mono">{t.id}</td><td>{dateTime(t.at)}</td><td>{t.counterId}</td><td>{t.cashier}</td>
                 <td>{t.mode === "VERIFY" ? "Kiểm tra chéo" : "Làn nhanh"}</td><td className="num">{t.lines.reduce((s, l) => s + l.qty, 0)}</td>
@@ -38,7 +40,7 @@ export function TransactionsPage() {
                 <td>{t.modelVersion}</td><td><Badge tone="ok">Đã thanh toán</Badge></td>
               </tr>
             ))}</tbody>
-          </table></div>
+          </table>{more}</div>
         )}
       </Card>
     </>

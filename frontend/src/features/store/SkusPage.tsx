@@ -33,9 +33,9 @@ export function SkusPage() {
         </>} />
       <div className="stats">
         <Stat label="SKU đang bán" value={skus.filter((s) => s.selling).length} />
-        <Stat label="Camera đã học" value={count("DA_HOC")} tone="ok" />
-        <Stat label="Đang học (thuộc đợt đang xử lý)" value={count("DANG_HOC")} />
-        <Stat label="Chưa học, chưa vào đợt nào" value={count("CHUA_HOC")} tone="warn" />
+        <Stat label="Camera đã học" value={count("LEARNED")} tone="ok" />
+        <Stat label="Đang học (thuộc đợt đang xử lý)" value={count("LEARNING")} />
+        <Stat label="Chưa học, chưa vào đợt nào" value={count("NOT_LEARNED")} tone="warn" />
       </div>
       <Card bodyClass="" title={<div className="row wrap">
         <span className="row" style={{ position: "relative" }}>
@@ -47,7 +47,7 @@ export function SkusPage() {
           {Object.entries(CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
         </select>
         <select className="select" value={learn} onChange={(e) => setLearn(e.target.value as LearnStatus | "ALL")}>
-          <option value="ALL">Mọi trạng thái học</option><option value="DA_HOC">Đã học</option><option value="DANG_HOC">Đang học</option><option value="CHUA_HOC">Chưa học</option>
+          <option value="ALL">Mọi trạng thái học</option><option value="LEARNED">Đã học</option><option value="LEARNING">Đang học</option><option value="NOT_LEARNED">Chưa học</option>
         </select>
         <span className="small muted">{rows.length} SKU</span>
       </div>}>

@@ -35,7 +35,7 @@ export function ProfilePage() {
         {user.role === "STORE_MANAGER" && (
           <Card title="PIN quản lý">
             <div className="col" style={{ gap: 12 }}>
-              <p className="small muted">PIN 6 số dùng để xác nhận tại quầy (báo nhầm, xóa dòng, hủy giao dịch). PIN không hiển thị lại sau khi lưu. PIN demo hiện tại: <b>246810</b>.</p>
+              <p className="small muted">PIN 6 số dùng để xác nhận tại quầy (hủy giao dịch, bỏ qua kiểm tra khay). PIN không hiển thị lại sau khi lưu. PIN demo hiện tại: <b>246810</b>.</p>
               <input className="input" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))} placeholder="6 chữ số" />
               <button className="btn primary" disabled={pin.length !== 6} onClick={() => { toast("Đã cập nhật PIN quản lý."); setPin(""); }}>Lưu PIN</button>
             </div>

@@ -1,0 +1,37 @@
+[project]
+name = "hybrid-checkout-backend"
+version = "0.1.0"
+description = "HybridCheckout backend API and Celery worker"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic-settings>=2.6",
+    "python-multipart>=0.0.12",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "celery[redis]>=5.4",
+    "redis>=5.2",
+    "boto3>=1.35",
+    "httpx>=0.28",
+    "pyjwt>=2.10",
+    "argon2-cffi>=23.1",
+]
+
+[project.optional-dependencies]
+# Trainer only: the GPU worker imports the recognition model's training code.
+ml = ["torch>=2.5", "torchvision>=0.20", "pillow>=11.0"]
+
+[dependency-groups]
+dev = ["pytest>=8.3", "ruff>=0.8", "mypy>=1.13", "schemathesis>=3.38"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
