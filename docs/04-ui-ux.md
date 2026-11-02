@@ -29,15 +29,15 @@ Tham khảo: hướng dẫn thiết kế POS (màn ít rối, nút lớn, bướ
 
 Định nghĩa bằng biến CSS trong [global.css](../frontend/src/styles/global.css).
 
-Phong cách đơn sắc: đen cho thao tác chính và khung, xám cho cấu trúc, màu chỉ dùng khi mang nghĩa (đạt, cần chú ý, cảnh báo, loại box). Thẻ dùng viền mảnh thay bóng đổ.
+Phong cách "Industrial": cả ứng dụng nằm trong một vỏ máy xám lạnh. Thẻ và nút là phím nổi (sáng mép trên, tối mép dưới, ánh sáng từ trên-trái), ô nhập và khay ảnh là phần lõm. Số liệu, tổng tiền và ô quét mã dùng màn hình tối. Đèn cam nhỏ chỉ báo mục đang chọn. Màu khác chỉ dùng khi mang nghĩa (đạt, cần chú ý, cảnh báo, loại box). Ốc vít và khe tản nhiệt chỉ để trang trí, không báo trạng thái.
 
 | Token | Giá trị | Dùng cho |
 |---|---|---|
-| `--primary` | `#0b0b0b` | Nút chính, mục đang chọn, bước hiện tại |
-| `--bg` / `--surface` / `--border` | `#f4f4f3` / `#ffffff` / `#e6e6e4` | Nền trang / thẻ / viền |
-| `--text` / `--text-2` / `--text-3` | `#0b0b0b` / `#55554f` / `#8b8b85` | Chữ chính / phụ / mờ |
-| `--ok` / `--warn` / `--danger` / `--info` | `#15803d` / `#a35a00` / `#c0261d` / `#1e48c2` | Đạt, Đã học · Cần chú ý · Cảnh báo Cao, lỗi · Trạng thái thông tin |
-| `--ink` | `#0b0b0b` | Sidebar, thanh quầy, nền trang đăng nhập |
+| `--chassis` / `--raised` / `--well` | `#cbd0d2` / `#e7eaeb` / `#b6bec2` | Vỏ máy / thẻ, phím / phần lõm |
+| `--field` / `--on-field` | `#20272b` / `#f2f4f4` | Màn hình tối: dải số liệu, tổng tiền, ô quét mã, nút chính |
+| `--accent` | `#f15b22` | Đèn chọn (menu, chế độ, bước hiện tại), viền focus |
+| `--text` / `--text-2` / `--text-3` | `#181e22` / `#414b52` / `#56616a` | Chữ chính / phụ / mờ |
+| `--ok` / `--warn` / `--danger` / `--info` | `#157a3a` / `#9a5200` / `#b4231a` / `#1e48c2` | Đạt, Đã học · Cần chú ý · Cảnh báo Cao, lỗi · Trạng thái thông tin |
 
 | Box trên ảnh | Màu | Kiểu |
 |---|---|---|
@@ -48,7 +48,7 @@ Phong cách đơn sắc: đen cho thao tác chính và khung, xám cho cấu tr�
 | Đề xuất của model khi gán nhãn | Xanh dương | Nét đứt (chờ), liền (đã chấp nhận) |
 | Box người vẽ | Tím | Viền liền |
 
-Font **Geist** cho chữ (có dấu tiếng Việt), **Geist Mono** cho mã vạch, mã giao dịch, tiêu đề cột và nhãn nhỏ viết hoa. Số tiền và chỉ số dùng `tabular-nums` cho thẳng cột. Thứ chỉ có trong prototype (dữ liệu giả lập, bộ mô phỏng thiết bị, tài khoản demo) có nhãn đen **PROTOTYPE** và khung nét đứt.
+Font **Hanken Grotesk** cho chữ (thay Host Grotesk của mẫu vì Host Grotesk thiếu dấu tiếng Việt), **IBM Plex Mono** cho mã vạch, mã giao dịch, số liệu trên màn hình tối, tiêu đề cột và nhãn nhỏ viết hoa. Thứ chỉ có trong prototype (dữ liệu giả lập, bộ mô phỏng thiết bị, tài khoản demo) có nhãn **PROTOTYPE**. Khi người dùng bật giảm chuyển động, phím không nhấc/lún nữa nhưng vẫn đổi bóng và màu.
 
 ## 4. Luồng chính
 

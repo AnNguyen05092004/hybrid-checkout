@@ -1,6 +1,6 @@
 # Bước 1 — Phân tích đề bài
 
-**Đề tài:** Hệ thống thanh toán tại quầy kết hợp mã vạch và thị giác máy tính
+**Đề tài:** Thanh toán tại quầy có camera AI hỗ trợ thu ngân: bắt món quét sót, quét nhanh hơn
 **Sản phẩm:** HybridCheckout
 
 ## 1. Bối cảnh

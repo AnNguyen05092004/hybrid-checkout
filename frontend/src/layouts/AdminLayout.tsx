@@ -59,16 +59,19 @@ export function AdminLayout() {
   const groups = NAV[user.role];
   const group = groups.find((g) => g.items.some((i) => pathname.startsWith(i.to)));
   const current = group?.items.find((i) => pathname.startsWith(i.to));
+  const order = groups.flatMap((g) => g.items);
 
   return (
-    <div className="admin">
+    <div className="admin housing">
       <aside className="sidebar">
-        <Brand />
+        <div className="head"><span className="screw" aria-hidden /><Brand /></div>
         {groups.map((g) => (
           <div key={g.title}>
             <div className="group">{g.title}</div>
             {g.items.map((i) => (
-              <NavLink key={i.to} to={i.to} className={({ isActive }) => (isActive ? "active" : "")}>{i.icon}{i.label}</NavLink>
+              <NavLink key={i.to} to={i.to} className={({ isActive }) => (isActive ? "active" : "")}>
+                {i.icon}{i.label}<span className="k" aria-hidden>{String(order.indexOf(i) + 1).padStart(2, "0")}</span>
+              </NavLink>
             ))}
           </div>
         ))}
@@ -81,6 +84,7 @@ export function AdminLayout() {
         <header className="topbar">
           <span className="crumb">{group?.title ?? "Tài khoản"}<span>/</span><b>{current?.label ?? "Hồ sơ"}</b></span>
           <div className="spacer" />
+          <span className="vents" aria-hidden />
           <span className="live" title="Phiên bản model đang chạy ở quầy"><i />model v{activeBatch}</span>
           <NavLink to="/profile" className="who">
             <span className="avatar">{initials(user.name)}</span>
@@ -90,6 +94,7 @@ export function AdminLayout() {
             </span>
           </NavLink>
           <button className="btn ghost sm" onClick={() => { logout(); navigate("/login"); }} aria-label="Đăng xuất"><LogOut size={18} /></button>
+          <span className="screw" aria-hidden />
         </header>
         <main className="page"><Outlet /></main>
       </div>

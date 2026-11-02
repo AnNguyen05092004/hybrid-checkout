@@ -58,7 +58,7 @@ export function SkuDetailPage() {
           {cutouts.length > 0 ? (
             <div className="cutouts">{cutouts.map((c) => <figure key={c.id} className="cutout"><img src={`/${c.file}`} alt={s.name} loading="lazy" /></figure>)}</div>
           ) : example ? (
-            <div style={{ position: "relative", overflow: "hidden", borderRadius: 8, aspectRatio: "1 / 1", background: "#141413" }}>
+            <div style={{ position: "relative", overflow: "hidden", borderRadius: 8, aspectRatio: "1 / 1", background: "#20272b" }}>
               <img src={`/${example.t.file}`} alt={s.name} style={{
                 position: "absolute", width: `${100 / example.o.box[2]}%`, left: `${(-example.o.box[0] / example.o.box[2]) * 100}%`, top: `${(-example.o.box[1] / example.o.box[2]) * 100}%`,
               }} />

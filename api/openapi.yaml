@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: HybridCheckout API
   version: 1.0.0
-  summary: API của hệ thống thanh toán tại quầy kết hợp mã vạch và thị giác máy tính.
+  summary: API của hệ thống thanh toán tại quầy có camera AI hỗ trợ thu ngân.
   description: |
     Contract của backend (design-first): backend FastAPI phải khớp file này, frontend sinh kiểu TypeScript từ file này.
 

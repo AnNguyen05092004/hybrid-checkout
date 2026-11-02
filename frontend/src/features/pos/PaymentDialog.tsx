@@ -51,8 +51,8 @@ export function PaymentDialog({ lines, alertCount, onPaid, onNew, onClose }: {
       <button className="btn" onClick={onClose}>Quay lại</button>
       <button className="btn primary lg" disabled={method === "CASH" && given < total} onClick={() => setTxId(onPaid(method))}>Xác nhận thanh toán</button>
     </>}>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <span className="muted">{items} món · {alertCount} cảnh báo đã xử lý</span>
+      <div className="readout">
+        <span className="eyebrow">{items} món · {alertCount} cảnh báo đã xử lý</span>
         <span className="total">{money(total)}</span>
       </div>
       <div className="seg" role="tablist">

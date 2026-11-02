@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, ScanBarcode, Camera, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { useStore } from "../../app/store";
 import { Brand } from "../../components/ui";
 import { HOME } from "../../app/home";
@@ -31,24 +31,26 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login">
+    <div className="login housing">
       <section className="login-art">
-        <span style={{ color: "#fff", fontSize: 17 }}><Brand /></span>
+        <span style={{ fontSize: 17 }}><Brand /></span>
         <div className="col" style={{ gap: 24 }}>
           <span className="scanframe" style={{ alignSelf: "flex-start" }}><span className="barcode" style={{ display: "block" }} /></span>
           <h1>Mã vạch tính tiền.<br /><em>Camera kiểm tra khay.</em></h1>
           <p className="lead">
-            Thanh toán tại quầy kết hợp mã vạch và thị giác máy tính: phát hiện món chưa quét trước khi khách trả tiền,
+            Thanh toán tại quầy có camera AI hỗ trợ thu ngân: phát hiện món chưa quét trước khi khách trả tiền,
             làn nhanh cho khay nhiều món, và cập nhật model khi cửa hàng nhập hàng mới.
           </p>
         </div>
         <div className="feat">
-          <div><ScanBarcode size={18} color="#fff" /><span><b>Kiểm tra chéo</b><br />Danh sách quét so với ảnh khay</span></div>
-          <div><Camera size={18} color="#fff" /><span><b>Làn nhanh</b><br />Camera đề xuất, thu ngân quét bổ sung</span></div>
-          <div><ShieldCheck size={18} color="#fff" /><span><b>PIN quản lý</b><br />Cảnh báo nghiêm trọng cần xác nhận</span></div>
+          <div><span className="n">01</span><span><b>Kiểm tra chéo</b><br />Danh sách quét so với ảnh khay</span></div>
+          <div><span className="n">02</span><span><b>Làn nhanh</b><br />Camera đề xuất, thu ngân quét bổ sung</span></div>
+          <div><span className="n">03</span><span><b>PIN quản lý</b><br />Cảnh báo nghiêm trọng cần xác nhận</span></div>
         </div>
       </section>
-      <section style={{ display: "grid", placeItems: "center", padding: 32 }}>
+      <section className="login-panel">
+        <div className="row"><span className="screw" aria-hidden /><span className="spacer" /><span className="vents" aria-hidden /><span className="screw" aria-hidden /></div>
+        <div style={{ flex: 1, display: "grid", placeItems: "center", padding: "24px 0" }}>
         <div className="col" style={{ width: "min(380px, 100%)", gap: 20 }}>
           <div>
             <span className="eyebrow">Tài khoản nội bộ</span>
@@ -61,9 +63,9 @@ export function LoginPage() {
             </label>
             <label className="field"><span>Mật khẩu</span>
               <span className="row" style={{ gap: 0 }}>
-                <input className="input" style={{ flex: 1, borderRadius: "6px 0 0 6px" }} type={show ? "text" : "password"} value={password}
+                <input className="input" style={{ flex: 1, borderRadius: "4px 0 0 4px" }} type={show ? "text" : "password"} value={password}
                   onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-                <button type="button" className="btn" style={{ borderRadius: "0 6px 6px 0", borderLeft: 0 }} onClick={() => setShow(!show)} aria-label={show ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
+                <button type="button" className="btn" style={{ borderRadius: "0 4px 4px 0", marginLeft: -1 }} onClick={() => setShow(!show)} aria-label={show ? "Ẩn mật khẩu" : "Hiện mật khẩu"}>
                   {show ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </span>
@@ -79,6 +81,7 @@ export function LoginPage() {
               ))}
             </div>
           </div>
+        </div>
         </div>
       </section>
     </div>

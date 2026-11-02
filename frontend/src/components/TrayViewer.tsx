@@ -18,7 +18,7 @@ const COLOR: Record<BoxKind, string> = {
   auto: "var(--box-match)",
   alert: "var(--box-alert)",
   review: "var(--box-review)",
-  uncertain: "#a3a39e",
+  uncertain: "#aeb8bd",
   proposal: "var(--box-proposal)",
   drawn: "var(--box-drawn)",
 };

@@ -52,7 +52,7 @@ flowchart TB
     sys ~~~ g
 
     classDef actor fill:#475569,color:#fff,stroke:#334155
-    classDef box fill:#f4f4f3,stroke:#0b0b0b,color:#0b0b0b,text-align:left
+    classDef box fill:#e7eaeb,stroke:#20272b,color:#181e22,text-align:left
     class cashier,manager,ml,admin actor
     class c,m,l,a,g box
     style actors fill:none,stroke:none

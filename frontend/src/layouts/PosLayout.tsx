@@ -16,7 +16,7 @@ export function PosLayout() {
   const counter = counters.find((c) => c.id === shift?.counterId);
 
   return (
-    <div className="pos">
+    <div className="pos housing">
       <header className="pos-bar">
         <Brand />
         <span className="chip">{counter ? counter.name : "Chưa mở ca"}</span>
@@ -26,6 +26,7 @@ export function PosLayout() {
         )}
         <span className="chip mono"><Cpu size={14} /> model v{activeBatch}</span>
         <div className="spacer" />
+        <span className="vents" aria-hidden />
         <span className="chip"><User size={14} /> {user?.name}</span>
         <span className="chip mono">{now.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
         {shift && <NavLink to="/pos/shift" className="btn sm"><History size={16} /> Lịch sử ca</NavLink>}

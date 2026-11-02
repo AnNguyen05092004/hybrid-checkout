@@ -24,7 +24,7 @@
 <body>
 <div id="map">
   <div class="side left" id="left"></div>
-  <div class="center" id="center"><b>HybridCheckout</b><span>Thanh toán tại quầy kết hợp mã vạch và thị giác máy tính</span></div>
+  <div class="center" id="center"><b>HybridCheckout</b><span>Thanh toán tại quầy có camera AI hỗ trợ thu ngân: bắt món quét sót, quét nhanh hơn</span></div>
   <div class="side right" id="right"></div>
   <svg id="lines"></svg>
 </div>
@@ -38,7 +38,7 @@ const LEFT = [
 ];
 const RIGHT = [
   ["Đăng nhập & phân quyền", "#ee8a84", ["Đăng nhập / đăng xuất", "Phân quyền theo 4 vai trò", "Chặn truy cập khi không đủ quyền"]],
-  ["Kiểm tra chéo", "#f4a76b", ["Quét mã từng món", "Chụp & đối chiếu khay", "Cảnh báo món chưa quét", "Cảnh báo nghi tráo mã", "Chặn thanh toán khi có cảnh báo"], true],
+  ["Kiểm tra chéo", "#f4a76b", ["Quét mã từng món", "Chụp khay khi khách đặt hàng", "Đối chiếu khi bấm Thanh toán", "Cảnh báo món chưa quét", "Cảnh báo nghi tráo mã", "Chặn thanh toán khi có cảnh báo"], true],
   ["Làn nhanh", "#e5c45a", ["Nhận diện cả khay", "Tự thêm món chắc chắn", "Quét xác nhận món không chắc", "Quét hàng mới chưa học"], true],
   ["Xử lý tại quầy", "#8fcf7e", ["Mở / đóng ca", "Quét bổ sung", "Quản lý xác nhận bằng PIN", "Xóa dòng / hủy giao dịch", "Thanh toán & hóa đơn"]],
   ["Báo cáo & giám sát", "#7fd0c8", ["Dashboard cửa hàng", "Hậu kiểm cảnh báo", "Lịch sử giao dịch", "Giám sát chất lượng model"]],

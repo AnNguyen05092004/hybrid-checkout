@@ -37,7 +37,7 @@ export function CartPanel({ co, onRemove, onCancel, onPay }: {
         ))}
       </div>
       <div className="col" style={{ padding: 14, borderTop: "1px solid var(--border)" }}>
-        <div className="row"><span className="muted">Tổng cộng</span><span className="spacer" /><span className="total">{money(total)}</span></div>
+        <div className="readout"><span className="eyebrow">Tổng cộng</span><span className="total">{money(total)}</span></div>
         {payBlocker && lines.length > 0 && <span className="small" style={{ color: "var(--warn)" }}>{payBlocker}</span>}
         <div className="row">
           <button className="btn lg" disabled={lines.length === 0} onClick={onCancel}>Hủy giao dịch</button>

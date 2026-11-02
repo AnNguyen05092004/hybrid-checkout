@@ -1,6 +1,6 @@
 # HybridCheckout
 
-**Hệ thống thanh toán tại quầy kết hợp mã vạch và thị giác máy tính.**
+**Thanh toán tại quầy có camera AI hỗ trợ thu ngân: bắt món quét sót, quét nhanh hơn.**
 
 Thu ngân vẫn quét mã vạch để tính tiền. Trước khi khách trả tiền, camera trên quầy chụp khay hàng, hệ thống so với danh sách đã quét và báo **món chưa quét** hoặc **nghi tráo mã**. Khi cửa hàng nhập hàng mới, model nhận diện học thêm SKU mới theo đợt mà không train lại từ đầu.
 
@@ -87,7 +87,7 @@ flowchart TB
     ml --> l
     admin --> a
     classDef actor fill:#475569,color:#fff,stroke:#334155
-    classDef box fill:#f4f4f3,stroke:#0b0b0b,color:#0b0b0b,text-align:left
+    classDef box fill:#e7eaeb,stroke:#20272b,color:#181e22,text-align:left
     class cashier,manager,ml,admin actor
     class c,m,l,a box
     style actors fill:none,stroke:none
