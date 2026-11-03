@@ -228,7 +228,7 @@ flowchart LR
 | UC21 | Duyệt phiên bản model | Kỹ sư ML | So với phiên bản đang chạy theo cổng duyệt |
 | UC22 | Deploy / rollback | Kỹ sư ML | Đưa phiên bản mới ra quầy hoặc quay lại bản trước |
 | UC23 | Cấu hình ngưỡng | Kỹ sư ML | Chỉnh ngưỡng cảnh báo, ngưỡng tự nhận; xem trước tác động |
-| UC24 | Giám sát model | Kỹ sư ML | Báo nhầm, bản sửa, cặp hay nhầm, độ trễ |
+| UC24 | Giám sát model | Kỹ sư ML (Quản lý chỉ xem, menu "Chất lượng camera") | Báo nhầm, bản sửa, cặp hay nhầm, độ trễ |
 | UC25 | Quản lý người dùng | Quản trị viên | Tạo, sửa, khóa tài khoản, gán vai trò |
 | UC26 | Quản lý quầy và camera | Quản trị viên | Thêm quầy, gán camera, chụp thử |
 | UC27 | Xem nhật ký | Quản trị viên | Thao tác quan trọng, chỉ đọc |

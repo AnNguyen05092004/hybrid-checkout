@@ -228,7 +228,7 @@ S01 Đăng nhập · S03 Không có quyền (khi mở trang ngoài quyền)
     │   └── M07 Đợt nhập → M08 Chi tiết đợt nhập
     │                        ├── L01 Ảnh mẫu & ảnh ghép     Kỹ sư ML (QL tải ảnh)
     │                        └── L02 Gán nhãn ảnh thật      Kỹ sư ML
-    ├── Model                                               Kỹ sư ML (QL xem)
+    ├── Model                                               Kỹ sư ML (QL chỉ xem L07, tên menu: Chất lượng camera)
     │   ├── L03 Job
     │   ├── L04 Phiên bản model → L05 Chi tiết & Cổng duyệt
     │   ├── L06 Ngưỡng nhận diện

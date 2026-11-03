@@ -23,7 +23,7 @@ Tham khảo: hướng dẫn thiết kế POS (màn ít rối, nút lớn, bướ
 |---|---|---|
 | Người dùng | Thu ngân, Quản lý | Quản lý, Kỹ sư ML, Quản trị viên |
 | Thiết bị | Màn cảm ứng ngang ≥ 1366×768 + máy quét | Máy tính ≥ 1280 px |
-| Bố cục | Thanh trạng thái tối; trái là ảnh khay, phải là mã vạch → cảnh báo → giỏ hàng → thanh toán | Sidebar tối, thanh trên, thẻ và bảng |
+| Bố cục | Thanh trạng thái với các ô thông tin tối (quầy, camera, model, thu ngân, giờ); trái là ảnh khay, phải là mã vạch → cảnh báo → giỏ hàng → thanh toán | Sidebar trái cùng màu vỏ máy, thanh trên, thẻ và bảng |
 
 ## 3. Design tokens
 
@@ -119,6 +119,8 @@ Gán nhãn ảnh thật, 3 cột: hàng mới cần vẽ (theo mã vạch) · �
 ![Đợt sau huấn luyện](images/ui/14-batch5-trained.png)
 
 ### Phiên bản model, Cổng duyệt, Ngưỡng, Giám sát
+Các màn này dành cho Kỹ sư ML. Quản lý chỉ thấy màn Giám sát, chỉ xem, với tên menu **Chất lượng camera**.
+
 ![Phiên bản model](images/ui/10-models.png)
 ![Cổng duyệt](images/ui/15-model-v5-gate.png)
 ![Ngưỡng](images/ui/17-thresholds.png)
