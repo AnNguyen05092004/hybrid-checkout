@@ -13,7 +13,8 @@ const RANGES = [{ days: 1, label: "Hôm nay" }, { days: 7, label: "7 ngày" }, {
 
 /** M01 — Store dashboard (US13). */
 export function DashboardPage() {
-  const { transactions, skus, isLearned, batches, activeBatch, counters, versionCreatedAt } = useStore();
+  const { user, transactions, skus, isLearned, batches, activeBatch, counters, versionCreatedAt } = useStore();
+  const isML = user?.role === "ML_ENGINEER";
   const navigate = useNavigate();
   const [days, setDays] = useState(7);
   const [counter, setCounter] = useState("ALL");
@@ -73,7 +74,9 @@ export function DashboardPage() {
           ]} />
         </Card>
         <div className="col" style={{ gap: 16 }}>
-          <Card title="Model đang chạy" actions={<Link to={`/models/v${activeBatch}`} className="small">Chi tiết</Link>}>
+          <Card title="Model đang chạy" actions={isML
+            ? <Link to={`/models/v${activeBatch}`} className="small">Chi tiết</Link>
+            : <Link to="/monitoring" className="small">Chất lượng camera</Link>}>
             <div className="col" style={{ gap: 6 }}>
               <span className="strong">{model.name}</span>
               <span className="small muted">Deploy {versionCreatedAt[model.id] ? dateTime(versionCreatedAt[model.id]) : "—"} · {model.skuCount} SKU</span>

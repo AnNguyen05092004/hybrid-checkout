@@ -41,7 +41,7 @@ export function MonitoringPage() {
 
   return (
     <>
-      <PageHeader title="Giám sát model" sub="Chất lượng nhận diện ngoài thực tế, từ cảnh báo, hậu kiểm và bản sửa ở làn nhanh" />
+      <PageHeader title={user?.role === "STORE_MANAGER" ? "Chất lượng camera" : "Giám sát model"} sub="Chất lượng nhận diện ngoài thực tế, từ cảnh báo, hậu kiểm và bản sửa ở làn nhanh" />
       <DemoNote>Độ trễ là số giả lập. Các tỉ lệ khác tính từ giao dịch giả lập của prototype.</DemoNote>
       <div className="stats">
         <Stat label="Độ trễ nhận diện trung vị" value={`${last.latency.toFixed(2).replace(".", ",")} giây`} hint="mục tiêu ≤ 3 giây (G5)" />

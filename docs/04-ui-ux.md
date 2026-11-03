@@ -33,10 +33,10 @@ Phong cách "Industrial": cả ứng dụng nằm trong một vỏ máy xám l�
 
 | Token | Giá trị | Dùng cho |
 |---|---|---|
-| `--chassis` / `--raised` / `--well` | `#cbd0d2` / `#e7eaeb` / `#b6bec2` | Vỏ máy / thẻ, phím / phần lõm |
-| `--field` / `--on-field` | `#20272b` / `#f2f4f4` | Màn hình tối: dải số liệu, tổng tiền, ô quét mã, nút chính |
+| `--chassis` / `--raised` / `--well` | `#c8cdd0` / `#f1f3f4` / `#b2babe` | Vỏ máy / thẻ, phím / phần lõm |
+| `--field` / `--on-field` | `#20272b` / `#fafbfb` | Màn hình tối: dải số liệu, tổng tiền, ô quét mã, nút chính |
 | `--accent` | `#f15b22` | Đèn chọn (menu, chế độ, bước hiện tại), viền focus |
-| `--text` / `--text-2` / `--text-3` | `#181e22` / `#414b52` / `#56616a` | Chữ chính / phụ / mờ |
+| `--text` / `--text-2` / `--text-3` | `#0f1417` / `#343e44` / `#48535b` | Chữ chính / phụ / mờ |
 | `--ok` / `--warn` / `--danger` / `--info` | `#157a3a` / `#9a5200` / `#b4231a` / `#1e48c2` | Đạt, Đã học · Cần chú ý · Cảnh báo Cao, lỗi · Trạng thái thông tin |
 
 | Box trên ảnh | Màu | Kiểu |

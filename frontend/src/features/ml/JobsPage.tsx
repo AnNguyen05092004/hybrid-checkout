@@ -31,7 +31,7 @@ export function JobsPage() {
           {open ? (
             <div className="col" style={{ gap: 10 }}>
               <div className="row"><JobBadge status={open.status} /><span className="spacer" /><span className="small muted">Đợt {open.batch} · {open.epochs} epoch</span></div>
-              <pre className="mono" style={{ background: "#20272b", color: "#f2f4f4", padding: 12, borderRadius: 8, maxHeight: 320, overflow: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
+              <pre className="mono" style={{ background: "#20272b", color: "#fafbfb", padding: 12, borderRadius: 8, maxHeight: 320, overflow: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
                 {open.log.join("\n")}
               </pre>
               <div className="row">

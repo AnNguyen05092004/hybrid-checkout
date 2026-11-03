@@ -136,9 +136,9 @@ export function BatchDetailPage() {
               <div className="col" style={{ gap: 8 }}>
                 <div className="row"><span className="mono">{job.id}</span><span className="spacer" /><JobBadge status={job.status} /></div>
                 <Progress value={(job.epoch / job.epochs) * 100} />
-                <span className="small muted">Epoch {job.epoch}/{job.epochs} · {job.gpuHours} giờ GPU · bắt đầu {dateTime(job.startedAt)}</span>
+                <span className="small muted">{isML ? `Epoch ${job.epoch}/${job.epochs} · ${job.gpuHours} giờ GPU · ` : ""}bắt đầu {dateTime(job.startedAt)}</span>
                 {isML && <Link to="/jobs" className="small">Xem log</Link>}
-                {versionStatus[vid] !== "NOT_TRAINED" && <div className="row"><Link to={`/models/${vid}`}>Phiên bản {vid}</Link><span className="spacer" /><VersionBadge status={versionStatus[vid]} /></div>}
+                {versionStatus[vid] !== "NOT_TRAINED" && <div className="row">{isML ? <Link to={`/models/${vid}`}>Phiên bản {vid}</Link> : <span>Phiên bản {vid}</span>}<span className="spacer" /><VersionBadge status={versionStatus[vid]} /></div>}
               </div>
             ) : <span className="small muted">Chưa có job.</span>}
           </Card>

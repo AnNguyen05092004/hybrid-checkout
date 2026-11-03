@@ -54,7 +54,7 @@ Mã màn hình: **S** chung · **P** quầy (POS) · **M** quản lý cửa hàn
 | Vai trò | Trang mặc định | Menu |
 |---|---|---|
 | Thu ngân | P01 Mở ca (P02 nếu đã có ca) | Không có sidebar. Thanh trên màn quầy có: Lịch sử ca, Đăng xuất |
-| Quản lý | M01 Dashboard | **Cửa hàng:** Dashboard · Cảnh báo · Giao dịch · Danh mục SKU · Đợt nhập — **Model (xem):** Phiên bản · Giám sát — nút **Mở màn quầy** |
+| Quản lý | M01 Dashboard | **Cửa hàng:** Dashboard · Cảnh báo · Giao dịch · Danh mục SKU · Đợt nhập · Chất lượng camera (L07, chỉ xem) — nút **Mở màn quầy** |
 | Kỹ sư ML | L04 Phiên bản model | **Model:** Phiên bản · Job · Ngưỡng · Giám sát — **Dữ liệu:** Đợt nhập · Danh mục SKU · Dashboard |
 | Quản trị viên | A01 Người dùng | Người dùng · Quầy & Camera · Nhật ký · Cài đặt lưu trữ |
 
@@ -153,7 +153,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 | Bộ lọc | Hôm nay / 7 ngày / 30 ngày; quầy | ✏️ | ✏️ |
 | Thẻ chỉ số | Doanh thu · Giá trị món chưa quét đã phát hiện · Khay có cảnh báo · Tỉ lệ báo nhầm · Độ phủ SKU | 👁 | 👁 |
 | Biểu đồ | Cảnh báo theo ngày, theo loại | 👁 | 👁 |
-| Model & đợt nhập | Model đang chạy; đợt nhập đang xử lý và tiến độ | 👁 | 👁 |
+| Model & đợt nhập | Model đang chạy (QL → L07, ML → L05); đợt nhập đang xử lý và tiến độ | 👁 | 👁 |
 | Chờ hậu kiểm | 5 báo nhầm ưu tiên cao nhất (BR-17) → M03 | ✏️ | 👁 |
 
 ### M02 — Cảnh báo & Hậu kiểm · `/alerts`
@@ -208,7 +208,7 @@ Cùng bố cục với P02, thứ tự ngược lại: nhận diện trước, q
 | 1. Ảnh mẫu → ảnh ghép | Điều kiện đã đạt; **Mở ảnh mẫu** → L01 | ✏️ | ✏️ |
 | 2. Ảnh thật → tập kiểm tra | Tiến độ hàng đợi; **Gán nhãn ảnh thật** → L02 | 👁 | ✏️ |
 | Gửi huấn luyện | Bật khi đạt BR-11; tùy chọn trộn ảnh thật vượt mức (BR-16) | — | ✏️ |
-| Job & phiên bản | Job của đợt, phiên bản sinh ra → L05 | 👁 | 👁 |
+| Job & phiên bản | Job của đợt, phiên bản sinh ra. QL chỉ thấy trạng thái; ML thấy epoch, giờ GPU, log và mở L05 | 👁 | 👁 |
 
 ## 7. Khu vực Quản trị — Model
 
@@ -240,19 +240,19 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lư
 | Chi tiết | Log; Hủy / Chạy lại | ✏️ |
 
 ### L04 — Phiên bản model · `/models`
-| Section | Nội dung | ML | QL |
-|---|---|:-:|:-:|
-| Thẻ chỉ số | Phiên bản đang chạy, số SKU, AP50, cAcc | 👁 | 👁 |
-| Biểu đồ | AP50 và cAcc qua các phiên bản, kèm giải thích | 👁 | 👁 |
-| Dòng thời gian + bảng | Mọi phiên bản, trạng thái, kết quả cổng duyệt → L05 | 👁 | 👁 |
+| Section | Nội dung | ML |
+|---|---|:-:|
+| Thẻ chỉ số | Phiên bản đang chạy, số SKU, AP50, cAcc | 👁 |
+| Biểu đồ | AP50 và cAcc qua các phiên bản, kèm giải thích | 👁 |
+| Dòng thời gian + bảng | Mọi phiên bản, trạng thái, kết quả cổng duyệt → L05 | 👁 |
 
 ### L05 — Chi tiết phiên bản & Cổng duyệt · `/models/:id`
-| Section | Nội dung | ML | QL |
-|---|---|:-:|:-:|
-| Cổng duyệt | Từng điều kiện: giá trị mới · bản đang chạy · Đạt / Không đạt | 👁 | 👁 |
-| Thông tin | Đợt, số SKU, cAcc, giờ GPU, job | 👁 | 👁 |
-| Cặp hay nhầm | Top cặp SKU nhầm trên val | 👁 | 👁 |
-| Hành động | **Deploy** (xác nhận; ghi lý do nếu không đạt) · **Từ chối** · **Rollback** | ✏️ | — |
+| Section | Nội dung | ML |
+|---|---|:-:|
+| Cổng duyệt | Từng điều kiện: giá trị mới · bản đang chạy · Đạt / Không đạt | 👁 |
+| Thông tin | Đợt, số SKU, cAcc, giờ GPU, job | 👁 |
+| Cặp hay nhầm | Top cặp SKU nhầm trên val | 👁 |
+| Hành động | **Deploy** (xác nhận; ghi lý do nếu không đạt) · **Từ chối** · **Rollback** | ✏️ |
 
 ### L06 — Ngưỡng nhận diện · `/thresholds`
 | Section | Nội dung | ML |
@@ -262,6 +262,9 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lư
 | Lịch sử | Các lần đổi; Hoàn tác | ✏️ |
 
 ### L07 — Giám sát model · `/monitoring`
+
+Quản lý vào màn này qua mục **Chất lượng camera**: cùng nội dung, chỉ xem, không có hành động và gợi ý dành cho kỹ sư ML. Quản lý không thấy L04, L05 vì đó là chỉ số kỹ thuật dùng để deploy.
+
 | Section | Nội dung | ML | QL |
 |---|---|:-:|:-:|
 | Thẻ chỉ số | Độ trễ, khay có cảnh báo, báo nhầm, % tự nhận | 👁 | 👁 |
@@ -290,7 +293,8 @@ Bố cục 3 cột: hàng mới cần vẽ · ảnh · danh sách box. Ảnh lư
 | M07, M08 Đợt nhập | — | ✏️ | ✏️ | — |
 | L01 Ảnh mẫu | — | ✏️ (tải ảnh) | ✏️ | — |
 | L02 Gán nhãn, L03 Job, L06 Ngưỡng | — | — | ✏️ | — |
-| L04, L05 Phiên bản, L07 Giám sát | — | 👁 | ✏️ | — |
+| L04, L05 Phiên bản | — | — | ✏️ | — |
+| L07 Giám sát (QL: Chất lượng camera) | — | 👁 | ✏️ | — |
 | A01, A02, A04 | — | — | — | ✏️ |
 | A03 Nhật ký | — | 👁 | — | 👁 |
 

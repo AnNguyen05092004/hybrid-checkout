@@ -364,7 +364,8 @@ Phiên bản mới (sau job huấn luyện) ở trạng thái **Chờ duyệt**.
 | Tạo đợt nhập | | ✓ | | |
 | Tải ảnh mẫu | | ✓ | ✓ | |
 | Duyệt ảnh cắt, tạo ảnh ghép, gán nhãn ảnh thật, gửi huấn luyện | | | ✓ | |
-| Job, phiên bản model, giám sát | | Xem | ✓ | |
+| Job, phiên bản model | | | ✓ | |
+| Giám sát model (với Quản lý: Chất lượng camera) | | Xem | ✓ | |
 | Deploy / rollback, ngưỡng | | | ✓ | |
 | Người dùng, quầy/camera, lưu dữ liệu | | | | ✓ |
 | Nhật ký | | Của cửa hàng | | ✓ |

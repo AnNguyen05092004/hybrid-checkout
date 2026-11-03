@@ -79,8 +79,8 @@ export default function App() {
             <Route path="/batches/:id/samples" element={<Allow roles={MML}><SamplesPage /></Allow>} />
             <Route path="/batches/:id/label" element={<Allow roles={ML}><LabelingPage /></Allow>} />
             <Route path="/jobs" element={<Allow roles={ML}><JobsPage /></Allow>} />
-            <Route path="/models" element={<Allow roles={MML}><ModelsPage /></Allow>} />
-            <Route path="/models/:id" element={<Allow roles={MML}><ModelDetailPage /></Allow>} />
+            <Route path="/models" element={<Allow roles={ML}><ModelsPage /></Allow>} />
+            <Route path="/models/:id" element={<Allow roles={ML}><ModelDetailPage /></Allow>} />
             <Route path="/thresholds" element={<Allow roles={ML}><ThresholdsPage /></Allow>} />
             <Route path="/monitoring" element={<Allow roles={MML}><MonitoringPage /></Allow>} />
             <Route path="/admin/users" element={<Allow roles={AD}><UsersPage /></Allow>} />

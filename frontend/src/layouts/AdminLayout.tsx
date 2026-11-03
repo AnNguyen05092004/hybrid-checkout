@@ -20,10 +20,7 @@ export const NAV: Record<Exclude<Role, "CASHIER">, Group[]> = {
       { to: "/transactions", label: "Giao dịch", icon: <Receipt size={18} /> },
       { to: "/skus", label: "Danh mục SKU", icon: <Tags size={18} /> },
       { to: "/batches", label: "Đợt nhập SKU", icon: <PackagePlus size={18} /> },
-    ] },
-    { title: "Model (xem)", items: [
-      { to: "/models", label: "Phiên bản model", icon: <Cpu size={18} /> },
-      { to: "/monitoring", label: "Giám sát model", icon: <Gauge size={18} /> },
+      { to: "/monitoring", label: "Chất lượng camera", icon: <Gauge size={18} /> },
     ] },
   ],
   ML_ENGINEER: [

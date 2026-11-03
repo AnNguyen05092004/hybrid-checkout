@@ -198,7 +198,8 @@ Mọi vai trò dùng chung UC01 Đăng nhập, UC02 Đăng xuất, UC03 Hồ sơ
 | Tạo đợt nhập | | ✓ | | |
 | Tải ảnh mẫu | | ✓ | ✓ | |
 | Duyệt ảnh cắt, tạo ảnh ghép, gán nhãn ảnh thật, gửi huấn luyện | | | ✓ | |
-| Job, phiên bản model, giám sát | | Xem | ✓ | |
+| Job, phiên bản model | | | ✓ | |
+| Giám sát model (với Quản lý: Chất lượng camera) | | Xem | ✓ | |
 | Deploy / rollback, ngưỡng | | | ✓ | |
 | Người dùng, quầy/camera, lưu dữ liệu | | | | ✓ |
 | Nhật ký | | Của cửa hàng | | ✓ |
@@ -239,7 +240,7 @@ S01 Đăng nhập · S03 Không có quyền (khi mở trang ngoài quyền)
 | Vai trò | Trang mặc định | Menu |
 |---|---|---|
 | Thu ngân | P01 Mở ca (P02 nếu đã có ca) | Không có sidebar; thanh trên có Lịch sử ca, Đăng xuất |
-| Quản lý | M01 Dashboard | Cửa hàng · Model (xem) · nút Mở màn quầy |
+| Quản lý | M01 Dashboard | Cửa hàng (gồm Chất lượng camera, chỉ xem) · nút Mở màn quầy |
 | Kỹ sư ML | L04 Phiên bản model | Model · Dữ liệu (Đợt nhập, Danh mục SKU, Dashboard) |
 | Quản trị viên | A01 Người dùng | Người dùng · Quầy & Camera · Nhật ký · Cài đặt |
 
