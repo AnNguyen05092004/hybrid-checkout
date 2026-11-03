@@ -465,7 +465,7 @@ Khung đã tạo thật, chưa có logic: `uv run pytest` và `ruff` pass, `dock
 Prototype React + TypeScript + Vite, dữ liệu giả lập trong bộ nhớ, thuật toán đối chiếu là code thật có unit test.
 
 ```bash
-python3 scripts/prepare_samples.py --model-repo <đường dẫn repo model>   # chép ảnh khay mẫu
+python3 scripts/prepare_samples.py --data-dir <thư mục ảnh khay ghép từ RPC>   # chép ảnh khay mẫu
 cd frontend && npm install
 npm run dev      # http://localhost:5173
 npm test         # unit test: đối chiếu khay, hậu kiểm, box

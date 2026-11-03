@@ -175,7 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setJobs((js) => js.map((j) => {
         if (j.id !== running.id) return j;
         if (j.status === "RUNNING" && j.epoch < j.epochs) {
-          return { ...j, epoch: j.epoch + 1, gpuHours: +(j.gpuHours + 5.9 / 16).toFixed(2), log: [...j.log, `Epoch ${j.epoch + 1}/${j.epochs} xong`] };
+          return { ...j, epoch: j.epoch + 1, gpuHours: +(j.gpuHours + 3.3 / 16).toFixed(2), log: [...j.log, `Epoch ${j.epoch + 1}/${j.epochs} xong`] };
         }
         if (j.status === "RUNNING") return { ...j, status: "EVALUATING", log: [...j.log, "Đánh giá trên tập kiểm tra ảnh thật của các đợt 1–5"] };
         return { ...j, status: "SUCCEEDED", finishedAt: new Date().toISOString(), log: [...j.log, "Đăng ký phiên bản v5 — chờ duyệt"] };

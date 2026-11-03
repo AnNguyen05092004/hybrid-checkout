@@ -257,7 +257,7 @@ Lỗi chung: `UNAUTHENTICATED` 401 · `FORBIDDEN` 403 · `NOT_FOUND` 404 · `VAL
 
 ## 6. Dịch vụ nhận diện (API nội bộ)
 
-Dịch vụ bọc model nhận diện đang nghiên cứu (D07). Nó không truy cập PostgreSQL và không biết gì về nghiệp vụ. Ngưỡng cảnh báo, đối chiếu và tự thêm món đều do backend làm.
+Dịch vụ bọc model nhận diện sau một API cố định (D07). Nó không truy cập PostgreSQL và không biết gì về nghiệp vụ. Ngưỡng cảnh báo, đối chiếu và tự thêm món đều do backend làm.
 
 | | Path | Ai gọi | Làm gì |
 |---|---|---|---|

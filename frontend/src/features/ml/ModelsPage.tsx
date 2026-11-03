@@ -16,7 +16,7 @@ export function ModelsPage() {
   return (
     <>
       <PageHeader title="Phiên bản model" sub="Mỗi đợt nhập sinh một phiên bản; chỉ một phiên bản chạy ở quầy tại một thời điểm" />
-      <DemoNote>AP50, cAcc (tập val) và giờ GPU là kết quả đánh giá thật của model. Chỉ số đối chiếu (bắt món sót, báo nhầm) là số minh họa của prototype.</DemoNote>
+      <DemoNote>Mọi chỉ số model (AP50, cAcc, mức quên, giờ GPU, bắt món sót, báo nhầm) là số minh họa của prototype.</DemoNote>
       <div className="stats">
         <Stat label="Đang chạy ở quầy" value={active.id} hint={active.name} tone="ok" />
         <Stat label="SKU camera nhận diện" value={active.skuCount} />
@@ -29,7 +29,7 @@ export function ModelsPage() {
             { name: "AP50", color: "#20272b", values: shown.map((v) => v.ap50) },
             { name: "cAcc", color: "#f59e0b", values: shown.map((v) => v.cacc) },
           ]} />
-          <p className="small muted" style={{ marginTop: 8 }}>AP50 giữ ổn định khi thêm SKU (model không quên SKU cũ). cAcc giảm vì khay chứa nhiều SKU hơn và mỗi khay có nhiều món: đúng từng món tốt chưa đủ để đúng cả khay, nên mã vạch vẫn là kênh tính tiền.</p>
+          <p className="small muted" style={{ marginTop: 8 }}>AP50 giữ ổn định khi thêm SKU (model gần như không quên SKU cũ). cAcc giảm vì khay chứa nhiều SKU hơn và mỗi khay có nhiều món: đúng từng món tốt chưa đủ để đúng cả khay, nên mã vạch vẫn là kênh tính tiền.</p>
         </Card>
         <Card title="Dòng thời gian">
           <div className="col" style={{ gap: 10 }}>
@@ -51,7 +51,7 @@ export function ModelsPage() {
             return (
               <tr key={v.id} className="clickable" onClick={() => navigate(`/models/${v.id}`)}>
                 <td className="strong">{v.name}</td><td>#{v.batch}</td><td className="num">{v.skuCount}</td><td className="num">{pct(v.ap50, 2)}</td>
-                <td className="num">{pct(v.cacc, 2)}</td><td className="num">≈ 0</td><td className="num">{v.gpuHours}</td>
+                <td className="num">{pct(v.cacc, 2)}</td><td className="num">{v.forgetting.toLocaleString("vi-VN")}</td><td className="num">{v.gpuHours}</td>
                 <td>{pass ? <span className="badge ok">Đạt</span> : <span className="badge danger">Không đạt</span>}</td><td><VersionBadge status={versionStatus[v.id]} /></td>
               </tr>
             );

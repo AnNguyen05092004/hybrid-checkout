@@ -30,7 +30,7 @@ export function JobsPage() {
         <Card title={open ? `Chi tiết ${open.id}` : "Chi tiết job"}>
           {open ? (
             <div className="col" style={{ gap: 10 }}>
-              <div className="row"><JobBadge status={open.status} /><span className="spacer" /><span className="small muted">Đợt {open.batch} · 16 epoch · ConvNeXt-V2-Base + PDP</span></div>
+              <div className="row"><JobBadge status={open.status} /><span className="spacer" /><span className="small muted">Đợt {open.batch} · {open.epochs} epoch</span></div>
               <pre className="mono" style={{ background: "#20272b", color: "#f2f4f4", padding: 12, borderRadius: 8, maxHeight: 320, overflow: "auto", margin: 0, whiteSpace: "pre-wrap" }}>
                 {open.log.join("\n")}
               </pre>

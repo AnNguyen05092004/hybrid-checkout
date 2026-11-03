@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   summary: API nội bộ của dịch vụ nhận diện — chỉ backend và worker gọi.
   description: |
-    Dịch vụ bọc model nhận diện đang nghiên cứu (D07: hệ thống không sửa code model). Không lưu trạng thái nghiệp vụ, không truy cập PostgreSQL.
+    Dịch vụ bọc model nhận diện sau một API cố định (D07: đổi model không cần sửa backend). Không lưu trạng thái nghiệp vụ, không truy cập PostgreSQL.
 
     - Chỉ mở trong mạng nội bộ; mỗi request mang `Authorization: Bearer <INFERENCE_TOKEN>`.
     - Một tiến trình nạp đúng một checkpoint tại một thời điểm (BR-07). Backend gọi `PUT /model` khi deploy hoặc rollback.

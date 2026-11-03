@@ -57,7 +57,7 @@ INSERT INTO jobs (id, type, batch_id, status, progress, progress_total, created_
   (1, 'TRAIN', 1, 'SUCCEEDED', 16, 16, 4, now(), now());
 INSERT INTO model_versions (id, code, name, batch_id, train_job_id, backbone, checkpoint_uri, status,
   ap50, cacc, forgetting, miss_recall, false_alarm_rate, swap_recall, gate_passed, gate_report) OVERRIDING SYSTEM VALUE VALUES
-  (1, 'v1', 'v1 — Khai trương', 1, 1, 'backbone', 'checkpoints/v1', 'ACTIVE', 93.4, 79.4, 0, 95.1, 5.8, 71.0, true, '{}');
+  (1, 'v1', 'v1 — Khai trương', 1, 1, 'backbone', 'checkpoints/v1', 'ACTIVE', 95.2, 81.5, 0, 95.1, 5.8, 71.0, true, '{}');
 INSERT INTO model_version_skus VALUES (1, 11, 0), (1, 12, 1);
 INSERT INTO model_deployments (action, model_version_id, performed_by) VALUES ('DEPLOY', 1, 4);
 INSERT INTO threshold_configs (batch_id, low_threshold, alert_threshold, auto_threshold, created_by) VALUES (1, 0.3, 0.5, 0.8, 4);

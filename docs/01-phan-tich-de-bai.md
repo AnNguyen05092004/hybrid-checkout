@@ -82,20 +82,24 @@ Mã vạch còn giúp camera: khi khay có **hàng mới model chưa học**, m�
 
 ## 5. Model nhận diện
 
-Hệ thống dùng model nhận diện đang được nghiên cứu: phát hiện và đếm SKU trên ảnh khay chụp từ trên xuống. Model **học thêm SKU mới theo đợt** mà không train lại từ đầu và không cần giữ ảnh của các đợt cũ.
+Model cần:
+- Phát hiện và đếm SKU trên ảnh khay chụp từ trên xuống, trả về box, SKU và độ tin cậy cho từng món.
+- **Học thêm SKU mới theo đợt** mà không train lại từ đầu và không quên SKU cũ (học tăng dần, incremental learning).
+- Học từ **ảnh ghép** (ảnh chụp từng sản phẩm, cắt nền, dán lên nền khay), được duyệt trên **ảnh khay thật**.
 
-Model học từ **ảnh ghép** (ảnh chụp từng sản phẩm, cắt nền, dán lên nền khay); các chỉ số dưới đây đo trên **ảnh khay thật**. Vì vậy hệ thống cũng lấy ảnh ghép để huấn luyện và ảnh thật để duyệt model.
+Hướng tiếp cận tham khảo IncreACO [9]: tạo ảnh ghép có tư thế, vị trí và độ che khuất giống khay thật, rồi học thêm SKU mới bằng distillation từ model cũ, trộn một phần nhỏ dữ liệu SKU cũ.
 
-| Chỉ số (bản mới nhất, 200 SKU) | Giá trị | Hệ quả cho thiết kế |
-|---|---|---|
-| AP50 (đúng từng món) | 94,9% | Đủ để gắn cờ món lệch |
-| cAcc (đúng cả khay) | 43,2% | Chưa đủ để tự tính tiền → giữ mã vạch |
-| cAcc khay dễ / vừa / khó | 62 / 41 / 27% | Khay nhiều món dễ sai → làn nhanh cần bước quét bổ sung |
-| Độ chính xác đề xuất box hàng cũ | ≥ 98,5% | Trợ lý gán nhãn đáng tin, người chỉ cần lướt duyệt |
-| Mức quên hàng cũ sau mỗi đợt | ≈ 0 | Model mới không làm hỏng việc kiểm tra hàng cũ |
-| Thời gian huấn luyện một đợt | 5–6 giờ GPU | Huấn luyện phải chạy nền |
+Kết quả công bố cho thấy vì sao camera **chưa thể tự tính tiền**: trên bộ RPC, IncreACO chỉ đếm đúng toàn bộ khoảng **77% khay** (66% với khay khó) [9].
 
-Dữ liệu: bộ RPC [8], 200 SKU thuộc 17 nhóm hàng, chia thành 5 đợt (100 + 4 × 25 SKU).
+| Đặc điểm của model | Hệ quả cho thiết kế |
+|---|---|
+| Nhận đúng từng món cao, nhưng đúng cả khay thấp hơn nhiều | Camera gắn cờ món lệch; mã vạch vẫn tính tiền |
+| Khay càng nhiều món càng dễ sai | Làn nhanh chỉ tự thêm món chắc chắn; còn lại thu ngân quét |
+| Học thêm SKU mới có thể làm giảm độ chính xác ở SKU cũ | Cổng duyệt đo mức quên trên ảnh thật của các đợt trước |
+| Huấn luyện mất nhiều giờ GPU | Huấn luyện chạy nền dưới dạng job |
+| Ảnh ghép vẫn khác ảnh thật | Cổng duyệt chỉ đo trên ảnh thật |
+
+Dữ liệu: bộ RPC [8], 200 SKU thuộc 17 nhóm hàng. Kịch bản demo chia thành 5 đợt nhập: 100 SKU lúc khai trương, sau đó mỗi đợt thêm 25 SKU.
 
 ## 6. Mục tiêu đo được
 
@@ -134,7 +138,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | Giấy phép | RPC: CC BY-NC-SA 4.0, chỉ dùng phi thương mại, không đưa ảnh gốc lên repo |
 | Mã vạch, giá | RPC không có; hệ thống tự gán mã dải nội bộ GS1 (tiền tố 200) và giá giả định |
 | Phần cứng mỗi quầy | 1 camera trên cao, 1 máy quét, 1 màn hình cảm ứng. Demo giả lập bằng ảnh mẫu |
-| Model | Chạy thành dịch vụ riêng (Python/PyTorch); demo dùng checkpoint có sẵn của 5 đợt |
+| Model | Chạy thành dịch vụ riêng (Python/PyTorch). Demo không huấn luyện thật; chỉ số model là số minh họa |
 | Quyền riêng tư | Ảnh khay lưu có hạn; ảnh của một đợt nhập bị xóa sau khi model đợt đó được deploy |
 
 ## 10. Rủi ro
@@ -160,7 +164,7 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 | D04 | Bốn vai trò: Thu ngân, Quản lý cửa hàng, Kỹ sư ML, Quản trị viên |
 | D05 | Đối chiếu diễn ra trước thanh toán; cảnh báo mức Cao chặn thanh toán. Thu ngân tự xác nhận báo nhầm, quản lý hậu kiểm sau theo thứ tự ưu tiên |
 | D06 | Camera chỉ kiểm tra SKU mà model đang chạy đã học |
-| D07 | Model chạy thành dịch vụ riêng, hệ thống không sửa code model |
+| D07 | Model chạy thành dịch vụ riêng sau một API cố định; đổi hoặc nâng cấp model không cần sửa backend |
 | D08 | Tài liệu tiếng Việt; prototype giao diện bằng React, dữ liệu giả lập |
 | D09 | Ảnh ghép là dữ liệu huấn luyện chính; ảnh thật làm tập kiểm tra. Trộn ảnh thật vào huấn luyện chỉ bật khi thí nghiệm cho thấy có lợi |
 
@@ -190,3 +194,4 @@ Chỉ tiêu ban đầu là giả thuyết, chốt lại sau khi đo. Ngưỡng l
 6. Retail Dive — *Amazon removes Just Walk Out tech from Amazon Fresh stores*: https://www.retaildive.com/news/amazon-removes-just-walk-out-tech-amazon-fresh-stores-dash-carts/712150
 7. NRF — *National Retail Security Survey 2023*: https://nrf.com/research/national-retail-security-survey-2023
 8. Wei et al. — *RPC: A Large-Scale Retail Product Checkout Dataset* (2019): https://rpc-dataset.github.io
+9. Yang et al. — *IncreACO: Incrementally Learned Automatic Check-out with Photorealistic Exemplar Augmentation* (WACV 2021): https://openaccess.thecvf.com/content/WACV2021/html/Yang_IncreACO_Incrementally_Learned_Automatic_Check-Out_With_Photorealistic_Exemplar_Augmentation_WACV_2021_paper.html

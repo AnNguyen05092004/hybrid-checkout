@@ -149,7 +149,7 @@ Gán nhãn ảnh thật, 3 cột: hàng mới cần vẽ (theo mã vạch) · �
 ## 8. Chạy prototype
 
 ```bash
-python3 scripts/prepare_samples.py --model-repo <đường dẫn repo model>   # chép ảnh khay mẫu
+python3 scripts/prepare_samples.py --data-dir <thư mục ảnh khay ghép từ RPC>   # chép ảnh khay mẫu
 cd frontend
 npm install
 npm run dev      # http://localhost:5173
@@ -159,9 +159,9 @@ npm run lint
 
 Giới hạn:
 - Dữ liệu nằm trong bộ nhớ trình duyệt: **tải lại trang (F5) là mất trạng thái**. Chuyển trang bằng menu thì giữ nguyên.
-- Ảnh khay là **ảnh ghép** từ bộ mẫu của model (có sẵn box), dùng thay cho ảnh camera, kể cả ở màn gán nhãn ảnh thật. Ảnh mẫu của SKU là ảnh cắt từ chính các ảnh ghép đó.
-- Nhận diện là mô phỏng: dùng box có sẵn của ảnh; hàng chưa học bị bỏ sót hoặc bị đoán thành hàng cũ cùng nhóm, giống model thật.
-- Huấn luyện mô phỏng khoảng 10 giây; số liệu AP50, cAcc của các phiên bản là kết quả đánh giá thật của model.
+- Ảnh khay là **ảnh ghép** tạo từ ảnh sản phẩm của bộ RPC (có sẵn box), dùng thay cho ảnh camera, kể cả ở màn gán nhãn ảnh thật. Ảnh mẫu của SKU là ảnh cắt từ chính các ảnh ghép đó.
+- Nhận diện là mô phỏng: dùng box có sẵn của ảnh; hàng chưa học bị bỏ sót hoặc bị đoán thành hàng cũ cùng nhóm, giống hành vi thường gặp của model.
+- Huấn luyện mô phỏng khoảng 10 giây; số liệu AP50, cAcc, giờ GPU của các phiên bản là **số minh họa**.
 - PIN quản lý demo: `246810`.
 
 ## 9. Kịch bản demo (khoảng 7 phút)

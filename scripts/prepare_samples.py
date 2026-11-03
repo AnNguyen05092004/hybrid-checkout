@@ -1,21 +1,23 @@
-"""Copy a few RPC tray images and the SKU list from the model repo into the UI prototype.
+"""Copy a few composite tray images into the UI prototype.
 
-Reads (never writes) the model repo:
-  configs/tasks_100-4x25_seed0.json             -> which SKU belongs to which task
-  data/synth_v2_sample_v1/annotations/task_*.json -> boxes of the sample tray images
+Reads (never writes) a folder of composite trays built from RPC product images, COCO style:
+  <data-dir>/annotations/task_<n>.json  images (file_name, width, height, level) and boxes
+                                        (category_id = RPC id, labeled, visible_fraction, cutout_id)
+  <data-dir>/<file_name>                the tray images
+and the demo SKU split frontend/src/mocks/generated/skus.json
+(200 RPC SKU: 100 at opening, then 4 import batches of 25).
 
 Writes:
-  frontend/src/mocks/generated/skus.json     200 SKU (rpc id, category, task)
   frontend/src/mocks/generated/samples.json  chosen trays, boxes normalised to 0..1
   frontend/src/mocks/generated/cutouts.json  product cutouts of the batch-5 SKU, per SKU
   frontend/public/samples/*.jpg              trays resized to 960 px (gitignored, CC BY-NC-SA 4.0)
   frontend/public/samples/cutouts/*.jpg      one crop per distinct cutout, 220 px (same licence)
 
-The sample trays are composites (product cutouts pasted on a tray background), so each box crop
-shows one cutout; the prototype uses these crops as the "sample photos" of a new SKU.
+Each box crop of a composite shows one product cutout; the prototype uses these crops as the
+"sample photos" of a new SKU.
 
 Usage:
-  python3 scripts/prepare_samples.py --model-repo <path to the model repo>
+  python3 scripts/prepare_samples.py --data-dir <folder of composite trays>
 Resizing uses `sips` (built into macOS).
 """
 
@@ -37,18 +39,14 @@ CUTOUT_SIZE = 220
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-repo", required=True, type=Path)
+    parser.add_argument("--data-dir", required=True, type=Path)
     args = parser.parse_args()
 
-    config = json.loads((args.model_repo / "configs/tasks_100-4x25_seed0.json").read_text())
-    skus = [
-        {"rpcId": c["rpc_category_id"], "label": c["label"], "category": c["supercategory"],
-         "task": t["task_id"]}
-        for t in config["tasks"] if not t["reserved"] for c in t["classes"]
-    ]
+    out_data = ROOT / "frontend/src/mocks/generated"
+    skus = json.loads((out_data / "skus.json").read_text())
     task_of = {s["rpcId"]: s["task"] for s in skus}
 
-    sample_dir = args.model_repo / "data/synth_v2_sample_v1"
+    sample_dir = args.data_dir
     out_images = ROOT / "frontend/public/samples"
     out_images.mkdir(parents=True, exist_ok=True)
     samples = []
@@ -77,9 +75,6 @@ def main():
 
     cutouts = crop_cutouts(sample_dir, task_of, ROOT / "frontend/public/samples/cutouts")
 
-    out_data = ROOT / "frontend/src/mocks/generated"
-    out_data.mkdir(parents=True, exist_ok=True)
-    (out_data / "skus.json").write_text(json.dumps(skus, indent=1))
     (out_data / "samples.json").write_text(json.dumps(samples, indent=1))
     (out_data / "cutouts.json").write_text(json.dumps(cutouts, indent=1))
     print(f"{len(skus)} SKU, {len(samples)} trays, "

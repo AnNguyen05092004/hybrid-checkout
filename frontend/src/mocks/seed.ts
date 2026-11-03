@@ -146,7 +146,7 @@ export const PAST_JOBS: Job[] = MODEL_VERSIONS.slice(0, 4).map((v) => ({
   gpuHours: v.gpuHours,
   startedAt: new Date(new Date(v.createdAt).getTime() - v.gpuHours * 3600_000).toISOString(),
   finishedAt: v.createdAt,
-  log: [`Huấn luyện đợt ${v.batch} trên RTX 4090`, "16/16 epoch", `Đánh giá val: cAcc ${v.cacc}% · AP50 ${v.ap50}%`, "Đăng ký phiên bản " + v.id],
+  log: [`Huấn luyện đợt ${v.batch}`, "16/16 epoch", `Đánh giá val: cAcc ${v.cacc}% · AP50 ${v.ap50}%`, "Đăng ký phiên bản " + v.id],
 }));
 
 export const PAST_AUDIT: AuditEntry[] = [

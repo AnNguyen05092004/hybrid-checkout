@@ -22,7 +22,7 @@ export function ModelDetailPage() {
   const base = status === "PENDING_REVIEW" ? active : MODEL_VERSIONS.find((m) => m.batch === v.batch - 1);
   const gates = [
     { name: "AP50 val không giảm quá 1 điểm", cand: pct(v.ap50, 2), ref: base ? pct(base.ap50, 2) : "—", pass: !base || v.ap50 >= base.ap50 - GATE.maxAp50Drop },
-    { name: `Mức quên SKU cũ ≤ ${GATE.maxForgetting} điểm AP50`, cand: "≈ 0", ref: "—", pass: v.forgetting <= GATE.maxForgetting },
+    { name: `Mức quên SKU cũ ≤ ${GATE.maxForgetting} điểm AP50`, cand: `${v.forgetting.toLocaleString("vi-VN")} điểm`, ref: "—", pass: v.forgetting <= GATE.maxForgetting },
     { name: `Bắt món sót (giả lập) ≥ ${GATE.minMissRecall}%`, cand: pct(v.missRecall), ref: base ? pct(base.missRecall) : "—", pass: v.missRecall >= GATE.minMissRecall },
     { name: `Báo nhầm trên khay quét đủ (giả lập) ≤ ${GATE.maxFalseAlarm}%`, cand: pct(v.falseAlarm), ref: base ? pct(base.falseAlarm) : "—", pass: v.falseAlarm <= GATE.maxFalseAlarm },
   ];
@@ -70,7 +70,7 @@ export function ModelDetailPage() {
             <tr key={`${p.from}-${p.to}`}><td><Link to={`/skus/${p.from}`}>{sku(p.from).name}</Link></td><td><Link to={`/skus/${p.to}`}>{sku(p.to).name}</Link></td><td>{sku(p.from).categoryName}</td><td className="num">{p.count}</td></tr>
           ))}</tbody>
         </table></div>
-        <p className="small faint" style={{ padding: "8px 16px 14px" }}>Nguồn: kết quả đánh giá model trên tập val.</p>
+        <p className="small faint" style={{ padding: "8px 16px 14px" }}>Số minh họa của prototype; khi có backend sẽ lấy từ kết quả đánh giá trên tập val.</p>
       </Card>
 
       {confirm === "deploy" && (
