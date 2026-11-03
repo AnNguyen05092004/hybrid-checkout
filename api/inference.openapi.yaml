@@ -174,7 +174,7 @@ components:
       type: object
       required: [model_version_id, image_width, image_height, latency_ms, detections]
       properties:
-        model_version_id: { type: integer, format: int64, description: Phiên bản đã chạy, backend lưu vào `tray_captures` (BR-06) }
+        model_version_id: { type: integer, format: int64, description: 'Phiên bản đã chạy, backend lưu vào `tray_captures` (BR-06)' }
         image_width: { type: integer }
         image_height: { type: integer }
         latency_ms: { type: integer, description: Chỉ phần suy luận }

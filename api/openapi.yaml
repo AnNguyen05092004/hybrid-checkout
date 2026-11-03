@@ -14,8 +14,6 @@ info:
 servers:
   - url: /api/v1
     description: Cùng origin với web app (nginx chuyển /api sang backend)
-  - url: http://localhost:8000/api/v1
-    description: Backend chạy local
 security:
   - bearerAuth: []
 tags:
@@ -2309,7 +2307,7 @@ components:
         - type: object
           required: [temporary_password]
           properties:
-            temporary_password: { type: string, description: Chỉ trả một lần, không lưu dạng rõ }
+            temporary_password: { type: string, description: 'Chỉ trả một lần, không lưu dạng rõ' }
     ProfileUpdate:
       type: object
       required: [full_name]
@@ -2373,7 +2371,7 @@ components:
       type: object
       required: [image_url, captured_at, latency_ms]
       properties:
-        image_url: { type: string, format: uri, description: URL ký sẵn, hết hạn sau 10 phút }
+        image_url: { type: string, format: uri, description: 'URL ký sẵn, hết hạn sau 10 phút' }
         captured_at: { type: string, format: date-time }
         latency_ms: { type: integer }
     ShiftOpen:
@@ -2844,7 +2842,7 @@ components:
             type: object
             required: [row, message]
             properties:
-              row: { type: integer, description: Số dòng trong file, tính cả dòng tiêu đề }
+              row: { type: integer, description: 'Số dòng trong file, tính cả dòng tiêu đề' }
               field: { type: string }
               message: { type: string }
 
@@ -2941,7 +2939,7 @@ components:
         photo_url: { type: string, format: uri }
         cutout_url: { type: [string, 'null'], format: uri, description: Null khi đang cắt nền }
         mask_quality: { type: [number, 'null'], minimum: 0, maximum: 1 }
-        needs_attention: { type: boolean, description: Điểm cắt nền thấp, hiện "Cần xem kỹ" }
+        needs_attention: { type: boolean, description: 'Điểm cắt nền thấp, hiện "Cần xem kỹ"' }
         status: { $ref: '#/components/schemas/SampleStatus' }
         uploaded_at: { type: string, format: date-time }
         reviewed_at: { type: [string, 'null'], format: date-time }
@@ -3084,7 +3082,7 @@ components:
         batch_id: { type: integer, format: int64 }
         status: { $ref: '#/components/schemas/JobStatus' }
         progress: { type: integer, minimum: 0 }
-        progress_total: { type: integer, description: Epoch khi huấn luyện, số ảnh khi ghép }
+        progress_total: { type: integer, description: 'Epoch khi huấn luyện, số ảnh khi ghép' }
         params:
           type: object
           additionalProperties: true
@@ -3112,7 +3110,7 @@ components:
       properties:
         ap50: { type: number, minimum: 0, maximum: 100 }
         cacc: { type: number, minimum: 0, maximum: 100, description: Chỉ để tham khảo }
-        forgetting: { type: number, description: Mức quên trung bình trên các đợt trước, điểm }
+        forgetting: { type: number, description: 'Mức quên trung bình trên các đợt trước, điểm' }
         miss_recall: { type: number, minimum: 0, maximum: 100 }
         false_alarm_rate: { type: number, minimum: 0, maximum: 100 }
         swap_recall: { type: number, minimum: 0, maximum: 100 }
@@ -3377,7 +3375,7 @@ components:
       required: [key, value, description, updated_by, updated_at]
       properties:
         key: { type: string, examples: [retention.transaction_days] }
-        value: { description: Giá trị JSON (số, chuỗi, bool) }
+        value: { description: 'Giá trị JSON (số, chuỗi, bool)' }
         description: { type: string }
         updated_by:
           oneOf:
